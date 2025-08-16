@@ -1,0 +1,143 @@
+{
+  "subject": "Machine Learning",
+  "modules": [
+    {
+      "module": "MODULE-1",
+      "topics": [
+        {
+          "name": "Well-Posed Learning Problems",
+          "sub_topics": [
+            "Definition of learning problems",
+            "Components of learning problems",
+            "Problem formulation"
+          ]
+        },
+        {
+          "name": "Designing a Learning System",
+          "sub_topics": [
+            "System architecture",
+            "Learning components",
+            "Performance metrics"
+          ]
+        },
+        {
+          "name": "Perspectives and Issues in Machine Learning",
+          "sub_topics": [
+            "Different learning paradigms",
+            "Key challenges",
+            "Evaluation methods"
+          ]
+        },
+        {
+          "name": "Concept Learning Task",
+          "sub_topics": [
+            "Concept definition",
+            "Training examples",
+            "Target concept"
+          ]
+        },
+        {
+          "name": "Concept Learning as Search",
+          "sub_topics": [
+            "Hypothesis space",
+            "Search strategies",
+            "General-to-specific ordering"
+          ]
+        },
+        {
+          "name": "Find-S Algorithm",
+          "sub_topics": [
+            "Algorithm steps",
+            "Maximally specific hypothesis",
+            "Limitations"
+          ]
+        },
+        {
+          "name": "Version Spaces and Candidate-Elimination Algorithm",
+          "sub_topics": [
+            "Version space definition",
+            "Candidate elimination",
+            "General and specific boundaries"
+          ]
+        },
+        {
+          "name": "Inductive Bias",
+          "sub_topics": [
+            "Bias definition",
+            "Types of bias",
+            "Role in learning"
+          ]
+        }
+      ]
+    },
+    {
+      "module": "MODULE-2",
+      "topics": [
+        {
+          "name": "Sequential Covering Algorithms",
+          "sub_topics": [
+            "Algorithm overview",
+            "Rule learning process",
+            "Coverage and accuracy"
+          ]
+        },
+        {
+          "name": "Learning Rule Sets",
+          "sub_topics": [
+            "Example-based methods",
+            "Rule representation",
+            "Rule evaluation"
+          ]
+        },
+        {
+          "name": "Learning First-Order Rules",
+          "sub_topics": [
+            "First-order logic",
+            "Rule induction",
+            "Predicate learning"
+          ]
+        },
+        {
+          "name": "FOIL Algorithm",
+          "sub_topics": [
+            "FOIL overview",
+            "First-order inductive learner",
+            "Algorithm implementation"
+          ]
+        },
+        {
+          "name": "Explanation-Based Learning",
+          "sub_topics": [
+            "EBL principles",
+            "Domain theories",
+            "Explanation construction"
+          ]
+        },
+        {
+          "name": "Perfect Domain Theories",
+          "sub_topics": [
+            "Complete domain knowledge",
+            "Deductive learning",
+            "Theory refinement"
+          ]
+        },
+        {
+          "name": "Learning Search Control Knowledge",
+          "sub_topics": [
+            "Search control strategies",
+            "Knowledge acquisition",
+            "Performance improvement"
+          ]
+        },
+        {
+          "name": "Inductive-Analytical Approaches",
+          "sub_topics": [
+            "Hybrid learning methods",
+            "Combining induction and analysis",
+            "Synergistic effects"
+          ]
+        }
+      ]
+    }
+  ]
+}

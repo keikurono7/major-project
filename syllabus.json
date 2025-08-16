@@ -1,0 +1,40 @@
+{
+  "subject": "Data Structures and Algorithms",
+  "topics": [
+    {
+      "name": "Linked Lists",
+      "sub_topics": [
+        "Singly Linked List",
+        "Doubly Linked List",
+        "Circular Linked List",
+        "Linked List Operations (Insertion, Deletion, Traversal)"
+      ]
+    },
+    {
+      "name": "Stacks and Queues",
+      "sub_topics": [
+        "Stack Operations (Push, Pop, Peek)",
+        "Queue Operations (Enqueue, Dequeue, Front)",
+        "Applications of Stacks and Queues"
+      ]
+    },
+    {
+      "name": "Trees",
+      "sub_topics": [
+        "Binary Trees",
+        "Tree Traversal (Inorder, Preorder, Postorder)",
+        "Binary Search Trees"
+      ]
+    },
+    {
+      "name": "Searching and Sorting",
+      "sub_topics": [
+        "Linear Search",
+        "Binary Search",
+        "Bubble Sort",
+        "Merge Sort",
+        "Quick Sort"
+      ]
+    }
+  ]
+}
