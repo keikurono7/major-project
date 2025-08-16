@@ -1,7 +1,7 @@
 {
   "student_id": "user123",
   "confidence_scores": {
-    "Well-Posed Learning Problems": 0.6,
+    "Well-Posed Learning Problems": 0.4,
     "Designing a Learning System": 0.6,
     "Perspectives and Issues in Machine Learning": 0.7999999999999999,
     "Concept Learning Task": 0.10000000000000003,
