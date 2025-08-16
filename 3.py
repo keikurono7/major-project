@@ -293,35 +293,35 @@ def get_next_quiz_topic(progress):
 def generate_quiz(vectordb, topic_name, student_confidence):
     """Generate quiz questions based on Machine Learning content from Tom Mitchell's book"""
     
-    # Enhanced prompt for Machine Learning topics
+    # Completely generalized prompt without bias
     prompt_template = """
-    You are an expert Machine Learning instructor creating quiz questions based on Tom Mitchell's "Machine Learning" textbook.
+    You are creating quiz questions based on the provided academic content.
 
-    Context from the book: {context}
+    Context from textbook: {context}
 
     Topic: {question}
 
-    Based on the provided context from Tom Mitchell's Machine Learning textbook, generate exactly 3 multiple-choice questions about {question}.
+    Create exactly 3 multiple-choice questions about "{question}" based on the context provided.
 
     Requirements:
-    1. Questions should test understanding of key concepts from the textbook
-    2. Include theoretical understanding and practical applications
-    3. Each question must have exactly 4 options (A, B, C, D)
-    4. Only one option should be correct
-    5. Questions should be appropriate for the topic difficulty
+    - Use the provided context to create relevant questions
+    - Each question must have exactly 4 options (A, B, C, D)
+    - Only one option should be correct
+    - Provide clear explanations
+    - Cover different aspects of the topic
 
-    Respond with a valid JSON array in this exact format:
+    Respond with valid JSON:
     [
       {{
-        "question": "What is the primary goal of the Find-S algorithm?",
+        "question": "Question text here?",
         "options": [
-          "A) To find the most general hypothesis",
-          "B) To find the most specific hypothesis consistent with training data", 
-          "C) To eliminate all hypotheses",
-          "D) To generate random hypotheses"
+          "A) First option",
+          "B) Second option", 
+          "C) Third option",
+          "D) Fourth option"
         ],
-        "answer": "B",
-        "explanation": "The Find-S algorithm finds the most specific hypothesis that is consistent with the positive training examples."
+        "answer": "A",
+        "explanation": "Explanation of why this answer is correct."
       }}
     ]
 
@@ -333,27 +333,24 @@ def generate_quiz(vectordb, topic_name, student_confidence):
         input_variables=["context", "question"]
     )
 
-    # Use the full model for generation but light model was used for embeddings
     llm = OllamaLLM(model=OLLAMA_MODEL)
 
-    # Create retrieval chain with enhanced retrieval
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
         retriever=vectordb.as_retriever(
             search_type="similarity",
-            search_kwargs={"k": 3}  # Fewer chunks for faster processing
+            search_kwargs={"k": 5}
         ),
         chain_type_kwargs={"prompt": prompt},
         return_source_documents=True
     )
 
     print(f"Generating quiz for: {topic_name}")
-    print("Searching Machine Learning textbook for relevant content...")
+    print("Searching textbook for relevant content...")
 
     try:
-        # Enhanced query for better retrieval
-        query = f"{topic_name} machine learning algorithm concept definition examples"
+        query = f"{topic_name} machine learning"
         response = qa_chain.invoke({"query": query})
         
         raw_response = response["result"]
@@ -366,80 +363,22 @@ def generate_quiz(vectordb, topic_name, student_confidence):
         json_end_index = raw_response.rfind("]") + 1
         
         if json_start_index == -1 or json_end_index == 0:
-            print("No JSON found in response, creating fallback quiz...")
-            return create_fallback_ml_quiz(topic_name)
+            print("Could not parse response. Please try again.")
+            return None
             
         json_string = raw_response[json_start_index:json_end_index]
         quiz_data = json.loads(json_string)
         
-        # Validate quiz structure
         if not isinstance(quiz_data, list) or len(quiz_data) == 0:
-            return create_fallback_ml_quiz(topic_name)
+            print("Invalid quiz format generated. Please try again.")
+            return None
             
         return quiz_data
         
     except (json.JSONDecodeError, Exception) as e:
         print(f"Error generating quiz: {e}")
-        print("Creating fallback quiz based on topic...")
-        return create_fallback_ml_quiz(topic_name)
-
-def create_fallback_ml_quiz(topic_name):
-    """Create fallback quiz questions for Machine Learning topics"""
-    
-    ml_quiz_templates = {
-        "Well-Posed Learning Problems": [
-            {
-                "question": "What are the three components of a well-posed learning problem?",
-                "options": ["A) Task, Performance, Experience", "B) Data, Algorithm, Model", "C) Input, Output, Function", "D) Training, Testing, Validation"],
-                "answer": "A",
-                "explanation": "A well-posed learning problem is defined by the task T, performance measure P, and experience E."
-            }
-        ],
-        "Find-S Algorithm": [
-            {
-                "question": "What does the Find-S algorithm find?",
-                "options": ["A) Most general hypothesis", "B) Most specific hypothesis", "C) Random hypothesis", "D) All hypotheses"],
-                "answer": "B", 
-                "explanation": "Find-S finds the most specific hypothesis consistent with positive training examples."
-            }
-        ],
-        "Concept Learning as Search": [
-            {
-                "question": "In concept learning, what is the hypothesis space?",
-                "options": ["A) Set of all possible concepts", "B) Set of all training examples", "C) Set of all possible hypotheses", "D) Set of all algorithms"],
-                "answer": "C",
-                "explanation": "The hypothesis space is the set of all possible hypotheses the learner may consider."
-            }
-        ]
-    }
-    
-    # Return specific quiz if available, otherwise generic
-    if topic_name in ml_quiz_templates:
-        base_quiz = ml_quiz_templates[topic_name]
-    else:
-        base_quiz = [
-            {
-                "question": f"What is a key concept in {topic_name}?",
-                "options": ["A) Algorithm complexity", "B) Data preprocessing", "C) Model evaluation", "D) Feature selection"],
-                "answer": "A",
-                "explanation": f"This is a fundamental concept in {topic_name} according to machine learning principles."
-            }
-        ]
-    
-    # Generate 3 questions
-    quiz = []
-    for i in range(3):
-        if i < len(base_quiz):
-            quiz.append(base_quiz[i])
-        else:
-            quiz.append({
-                "question": f"Which principle is important in {topic_name}?",
-                "options": [f"A) Principle {i+1}", f"B) Principle {i+2}", f"C) Principle {i+3}", f"D) Principle {i+4}"],
-                "answer": "A",
-                "explanation": f"This principle is fundamental to understanding {topic_name}."
-            })
-    
-    return quiz
+        print("Please try again.")
+        return None
 
 # --- Main Program Loop ---
 if __name__ == "__main__":
@@ -499,4 +438,4 @@ if __name__ == "__main__":
             print(f"Updated confidence for {weakest_topic}: {progress['confidence_scores'][weakest_topic]:.2f}")
             print(f"\nFull progress: {progress}")
         else:
-            print("Unable to generate quiz. Please check the PDF file and try again.")
+            print("Unable to generate quiz. Please try running the program again.")
