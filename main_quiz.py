@@ -204,18 +204,52 @@ def get_next_quiz_topic(progress):
     return min(progress["confidence_scores"], key=progress["confidence_scores"].get)
 
 # --- Quiz Generation ---
+def wait_for_ollama():
+    """Wait for Ollama to be ready"""
+    import requests
+    import time
+    
+    max_retries = 30  # 5 minutes
+    for i in range(max_retries):
+        try:
+            response = requests.get("http://localhost:11434/api/tags", timeout=5)
+            if response.status_code == 200:
+                print("✅ Ollama is ready!")
+                
+                # Check if models are available
+                models_data = response.json()
+                models = [model.get('name', '') for model in models_data.get('models', [])]
+                
+                required_models = ['mistral:7b', 'nomic-embed-text:latest']
+                missing_models = [model for model in required_models 
+                                if not any(model.split(':')[0] in existing for existing in models)]
+                
+                if missing_models:
+                    print(f"⚠️ Missing models: {missing_models}")
+                    print("Models are still downloading. This may take several minutes...")
+                    time.sleep(30)  # Wait longer if models are missing
+                    continue
+                
+                print(f"✅ Available models: {models}")
+                return True
+                
+        except Exception as e:
+            print(f"⏳ Waiting for Ollama... ({i+1}/{max_retries}) - {str(e)[:50]}...")
+        
+        time.sleep(10)
+    
+    print("❌ Ollama failed to start within timeout period")
+    return False
+
 def generate_quiz(vectordb, topic_name, student_confidence):
-    """
-    Generate quiz questions based on Machine Learning content from textbook
+    """Generate quiz questions based on Machine Learning content from textbook"""
     
-    Args:
-        vectordb: Vector database instance
-        topic_name (str): Topic to generate quiz for
-        student_confidence (float): Current confidence level for topic
+    # Ensure Ollama is ready
+    print("Checking Ollama connection...")
+    if not wait_for_ollama():
+        print("❌ Ollama is not responding.")
+        return None
     
-    Returns:
-        list: List of quiz questions or None if generation fails
-    """
     prompt_template = """
     You are creating quiz questions based on the provided academic content.
 
@@ -268,8 +302,8 @@ def generate_quiz(vectordb, topic_name, student_confidence):
         return_source_documents=True
     )
 
-    print(f"Generating quiz for: {topic_name}")
-    print("Searching textbook for relevant content...")
+    print(f"🎯 Generating quiz for: {topic_name}")
+    print("📖 Searching textbook for relevant content...")
 
     try:
         query = f"{topic_name} machine learning"
@@ -278,28 +312,28 @@ def generate_quiz(vectordb, topic_name, student_confidence):
         raw_response = response["result"]
         source_docs = response.get("source_documents", [])
         
-        print(f"Found {len(source_docs)} relevant sections from the textbook")
+        print(f"📚 Found {len(source_docs)} relevant sections from the textbook")
         
         # Parse JSON response
         json_start_index = raw_response.find("[")
         json_end_index = raw_response.rfind("]") + 1
         
         if json_start_index == -1 or json_end_index == 0:
-            print("Could not parse response. Please try again.")
+            print("❌ Could not parse AI response.")
             return None
             
         json_string = raw_response[json_start_index:json_end_index]
         quiz_data = json.loads(json_string)
         
         if not isinstance(quiz_data, list) or len(quiz_data) == 0:
-            print("Invalid quiz format generated. Please try again.")
+            print("❌ Invalid quiz format generated.")
             return None
             
+        print(f"✅ Successfully generated {len(quiz_data)} questions")
         return quiz_data
         
     except (json.JSONDecodeError, Exception) as e:
-        print(f"Error generating quiz: {e}")
-        print("Please try again.")
+        print(f"❌ Error generating quiz: {e}")
         return None
 
 # --- Utility Functions ---
