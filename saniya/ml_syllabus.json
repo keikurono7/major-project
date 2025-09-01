@@ -1,0 +1,79 @@
+{
+  "subject": "Machine Learning",
+  "modules": [
+    {
+      "module": "MODULE-1",
+      "topics": [
+        {
+          "name": "Well-Posed Learning Problems",
+          "sub_topics": []
+        },
+        {
+          "name": "Designing a Learning System",
+          "sub_topics": []
+        },
+        {
+          "name": "Perspectives and Issues in Machine Learning",
+          "sub_topics": []
+        },
+        {
+          "name": "Concept Learning Task",
+          "sub_topics": []
+        },
+        {
+          "name": "Concept Learning as Search",
+          "sub_topics": []
+        },
+        {
+          "name": "Find-S Algorithm",
+          "sub_topics": []
+        },
+        {
+          "name": "Version Spaces and Candidate-Elimination Algorithm",
+          "sub_topics": []
+        },
+        {
+          "name": "Inductive Bias",
+          "sub_topics": []
+        }
+      ]
+    },
+    {
+      "module": "MODULE-2",
+      "topics": [
+        {
+          "name": "Sequential Covering Algorithms",
+          "sub_topics": []
+        },
+        {
+          "name": "Learning Rule Sets",
+          "sub_topics": []
+        },
+        {
+          "name": "Learning First-Order Rules",
+          "sub_topics": []
+        },
+        {
+          "name": "FOIL Algorithm",
+          "sub_topics": []
+        },
+        {
+          "name": "Explanation-Based Learning",
+          "sub_topics": []
+        },
+        {
+          "name": "Perfect Domain Theories",
+          "sub_topics": []
+        },
+        {
+          "name": "Learning Search Control Knowledge",
+          "sub_topics": []
+        },
+        {
+          "name": "Inductive-Analytical Approaches",
+          "sub_topics": []
+        }
+      ]
+    }
+  ]
+}

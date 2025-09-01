@@ -9,7 +9,7 @@ from langchain.chains import RetrievalQA
 
 # --- Configuration ---
 PDF_PATH = "MachineLearningTomMitchell.pdf"
-OLLAMA_MODEL = "mistral:7b"  # Keep this for LLM generation
+OLLAMA_MODEL = "quiz-generator"  # Replace mistral:7b with your specialized model
 EMBEDDING_MODEL = "nomic-embed-text"  # Light embedding model
 PROGRESS_FILE_PATH = "progress_user123.json"
 
@@ -380,6 +380,39 @@ def generate_quiz(vectordb, topic_name, student_confidence):
         print("Please try again.")
         return None
 
+def generate_quiz_with_tools(vectordb, topic_name, student_confidence):
+    # Get relevant context from the database
+    retriever = vectordb.as_retriever(search_kwargs={"k": 3})
+    docs = retriever.get_relevant_documents(f"{topic_name} machine learning")
+    context = "\n\n".join([doc.page_content for doc in docs])
+    
+    # Create the prompt
+    prompt = f"""[INST] Based on the following academic content about {topic_name}:
+
+    {context[:2000]}  # Limit context length for performance
+    
+    Create exactly 3 multiple-choice questions about "{topic_name}" in machine learning.
+    Each question must have 4 options labeled A through D, with one correct answer.
+    Provide explanations for the correct answers. [/INST]"""
+    
+    # Call the model
+    llm = OllamaLLM(model=OLLAMA_MODEL)
+    response = llm.invoke(prompt)
+    
+    try:
+        # Try to parse as standard JSON first
+        return json.loads(response)
+    except json.JSONDecodeError:
+        # Fallback parsing logic
+        json_start = response.find("[")
+        json_end = response.rfind("]") + 1
+        if json_start >= 0 and json_end > 0:
+            try:
+                return json.loads(response[json_start:json_end])
+            except:
+                return None
+        return None
+
 # --- Main Program Loop ---
 if __name__ == "__main__":
     # Create ML syllabus file
@@ -404,7 +437,14 @@ if __name__ == "__main__":
         print(f"Generating quiz for your weakest topic: {weakest_topic}")
         print(f"Current confidence level: {confidence:.2f}\n")
 
-        quiz = generate_quiz(vectordb, weakest_topic, confidence)
+        # Attempt to generate quiz using optimized tool-based method
+        print(f"Attempting to generate quiz using optimized tool-based method...")
+        quiz = generate_quiz_with_tools(vectordb, weakest_topic, confidence)
+
+        # Add fallback to original method if tool-based generation fails
+        if not quiz:
+            print(f"Falling back to standard quiz generation method...")
+            quiz = generate_quiz(vectordb, weakest_topic, confidence)
 
         if quiz:
             print("=" * 60)
