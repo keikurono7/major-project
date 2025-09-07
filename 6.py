@@ -580,3 +580,40 @@ if __name__ == "__main__":
         print("\n🎉 Assignment Complete!")
     else:
         print("❌ Unable to generate assignment. Please try running the program again.")
+
+def parse_assignment_questions(raw_text, topic_name):
+    """Parse assignment questions from raw text output"""
+    questions = []
+    
+    # Split the text into question blocks
+    # Look for patterns like "Question 1:" or "Q1." or "1."
+    question_blocks = re.split(r'(?:Question\s*\d+[:.]|Q\d+[:.]|\n\d+[:.]\s)', raw_text)
+    
+    # Process each question block
+    for block in question_blocks:
+        block = block.strip()
+        if not block:
+            continue
+            
+        # Extract the question text (first paragraph or until "Answer Guidelines:")
+        question_match = re.search(r'^(.*?)(?:(?:\n\n|\r\n\r\n|Answer Guidelines:)|\Z)', 
+                                 block, re.DOTALL)
+        question_text = question_match.group(1).strip() if question_match else ""
+        
+        # Extract answer guidelines if present
+        guidelines_match = re.search(r'(?:Answer Guidelines:|Guidelines:)\s*(.*)', 
+                                    block, re.DOTALL)
+        answer_guidelines = guidelines_match.group(1).strip() if guidelines_match else ""
+        
+        # Only add if we have a valid question
+        if len(question_text) > 10:
+            questions.append({
+                "question": question_text,
+                "answer_guidelines": answer_guidelines,
+                "topic": topic_name,
+                "type": "long_answer",
+                "estimated_time_minutes": 20,
+                "marks": 15
+            })
+    
+    return questions

@@ -1,0 +1,44 @@
+================================================================================
+                   MACHINE LEARNING COMPREHENSIVE EXAMINATION                   
+Date: 2025-09-06
+Duration: 3 hours 0 minutes
+Total Marks: 60
+================================================================================
+
+INSTRUCTIONS:
+1. Answer ALL questions
+2. This paper contains theoretical and practical long-answer questions
+3. Write all answers in the answer booklet provided
+4. Each question carries marks as indicated
+5. Detailed explanations with relevant examples are expected for full marks
+
+--------------------------------------------------------------------------------
+SECTION A: THEORETICAL QUESTIONS
+--------------------------------------------------------------------------------
+Answer all theoretical questions. Focus on clear explanation of concepts.
+
+Question 1 [10 marks]
+Explain how Learning First-Order Rules extends beyond propositional rule learning and discuss its significance in inductive logic programming (ILP). In your discussion, elucidate on why first-order Horn clauses are a suitable representation for expressing PROLOG programs. Additionally, outline the challenges of using sequential covering algorithms to learn these rules from examples.
+
+Question 2 [10 marks]
+Explain how Version Spaces can be used to represent hypotheses in conjunction with noise and provide a detailed analysis of why, under certain conditions, Candidate-Elimination Algorithm might fail to converge despite the absence of errors in training examples. Discuss potential algorithmic modifications that could enhance convergence guarantees.
+
+Question 3 [10 marks]
+Explain how explanation-based learning (EBL) differs from inductive and deductive reasoning approaches in machine learning, focusing on its unique advantages for acquiring knowledge representations.
+
+
+--------------------------------------------------------------------------------
+SECTION B: PRACTICAL APPLICATIONS
+--------------------------------------------------------------------------------
+Answer all practical questions. Show your approach and methodology.
+
+Question 1 [10 marks]
+You are working on developing a diagnostic tool using inductive logic programming (ILP) to assist doctors in diagnosing diseases based on symptoms and patient history inputs, which can be represented as first-order Horn clauses. The system should learn from examples of past cases where the outcome is known.
+
+Question 2 [10 marks]
+A supermarket chain wants to implement a system that categorizes products into 'perishable' or 'non-perishable' based on customer feedback and supply data, using machine learning techniques sensitive to concept noise in the dataset. Describe how you would apply Version Spaces and Candidate-Elimination Algorithm for this task.
+
+Question 3 [10 marks]
+Explain how explanation-based learning (EBL) can be applied to improve anomaly detection in a cybersecurity context, considering both inductive and analytical components of machine learning.
+
+
