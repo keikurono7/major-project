@@ -1,0 +1,1216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Education Platform API Tester</title>
+    <style>
+        :root {
+            --primary: #4361ee;
+            --secondary: #3f37c9;
+            --success: #4cc9f0;
+            --danger: #f72585;
+            --warning: #f8961e;
+            --light: #f8f9fa;
+            --dark: #212529;
+            --gray: #6c757d;
+        }
+        
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+        }
+        
+        body {
+            background-color: #f5f5f7;
+            color: var(--dark);
+            line-height: 1.6;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background-color: var(--primary);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .user-info {
+            display: flex;
+            justify-content: flex-end;
+            align-items: center;
+            padding: 10px 20px;
+            background-color: #f0f0f5;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .user-info.logged-in {
+            background-color: #e8f4fe;
+        }
+        
+        .user-badge {
+            padding: 5px 10px;
+            background-color: var(--primary);
+            color: white;
+            border-radius: 20px;
+            font-size: 14px;
+            margin-right: 10px;
+        }
+        
+        .user-badge.student {
+            background-color: #4cc9f0;
+        }
+        
+        .user-badge.teacher {
+            background-color: #4361ee;
+        }
+        
+        .tabs {
+            display: flex;
+            background-color: #f0f0f5;
+            border-bottom: 1px solid #ddd;
+            overflow-x: auto;
+        }
+        
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 14px;
+            font-weight: 500;
+            color: var(--gray);
+            transition: all 0.2s;
+        }
+        
+        .tab.active {
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+        }
+        
+        .tab:hover {
+            background-color: rgba(0,0,0,0.05);
+        }
+        
+        .tab-content {
+            display: none;
+            padding: 20px;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        .endpoint-section {
+            margin-bottom: 25px;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+        
+        .endpoint-title {
+            margin-bottom: 15px;
+            color: var(--primary);
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .input-group {
+            margin-bottom: 15px;
+        }
+        
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            font-size: 14px;
+        }
+        
+        input, select, textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        textarea {
+            min-height: 100px;
+            font-family: monospace;
+        }
+        
+        .file-input {
+            padding: 10px 0;
+        }
+        
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: background-color 0.2s;
+        }
+        
+        button:hover {
+            background-color: var(--secondary);
+        }
+        
+        button.secondary {
+            background-color: var(--gray);
+        }
+        
+        button.secondary:hover {
+            background-color: #5a6268;
+        }
+        
+        button.danger {
+            background-color: var(--danger);
+        }
+        
+        button.danger:hover {
+            background-color: #e01e5a;
+        }
+        
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            background-color: #f0f0f5;
+            overflow: auto;
+        }
+        
+        .response pre {
+            font-family: monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        
+        .status {
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-weight: bold;
+            display: inline-block;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+        
+        .success {
+            background-color: rgba(76, 201, 240, 0.2);
+            color: var(--success);
+        }
+        
+        .error {
+            background-color: rgba(247, 37, 133, 0.2);
+            color: var(--danger);
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,.3);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            margin-left: 10px;
+        }
+        
+        .auth-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+        
+        .auth-toggle {
+            display: flex;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .auth-toggle button {
+            flex: 1;
+            padding: 10px;
+            border: none;
+            background: #f0f0f5;
+            color: var(--gray);
+        }
+        
+        .auth-toggle button.active {
+            background: var(--primary);
+            color: white;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Education Platform API Tester</h1>
+            <p>Test all API endpoints of your educational platform</p>
+        </header>
+        
+        <div id="user-info" class="user-info">
+            <div id="user-content-logged-out">
+                <span>Not logged in</span>
+                <button onclick="setActiveTab('auth')">Login / Signup</button>
+            </div>
+            <div id="user-content-logged-in" class="hidden">
+                <span id="user-name">User</span>
+                <span id="user-role-badge" class="user-badge">Role</span>
+                <button onclick="handleLogout()" class="secondary">Logout</button>
+            </div>
+        </div>
+        
+        <div class="tabs">
+            <button class="tab" data-tab="auth">Authentication</button>
+            <button class="tab" data-tab="syllabus">Course & Syllabus</button>
+            <button class="tab" data-tab="quiz">Quizzes</button>
+            <button class="tab" data-tab="assignment">Assignments</button>
+            <button class="tab" data-tab="question-paper">Question Papers</button>
+            <button class="tab" data-tab="student">Student Progress</button>
+        </div>
+        
+        <!-- Authentication Tab -->
+        <div class="tab-content" id="auth">
+            <div class="endpoint-section">
+                <div class="auth-toggle">
+                    <button id="login-toggle" class="active" onclick="toggleAuthMode('login')">Login</button>
+                    <button id="signup-toggle" onclick="toggleAuthMode('signup')">Sign Up</button>
+                </div>
+                
+                <!-- Login Form -->
+                <div id="login-form">
+                    <h2 class="endpoint-title">Login to API</h2>
+                    <div class="input-group">
+                        <label for="login-email">Email:</label>
+                        <input type="email" id="login-email" placeholder="Enter your email">
+                    </div>
+                    <div class="input-group">
+                        <label for="login-password">Password:</label>
+                        <input type="password" id="login-password" placeholder="Enter your password">
+                    </div>
+                    <button onclick="handleLogin()">Login</button>
+                    <div id="login-spinner" class="loading hidden"></div>
+                    <div id="login-response" class="response hidden">
+                        <div class="status" id="login-status"></div>
+                        <pre id="login-result"></pre>
+                    </div>
+                </div>
+                
+                <!-- Signup Form -->
+                <div id="signup-form" class="hidden">
+                    <h2 class="endpoint-title">Create New Account</h2>
+                    <div class="input-group">
+                        <label for="signup-email">Email:</label>
+                        <input type="email" id="signup-email" placeholder="Enter your email">
+                    </div>
+                    <div class="input-group">
+                        <label for="signup-password">Password:</label>
+                        <input type="password" id="signup-password" placeholder="Enter password">
+                    </div>
+                    <div class="input-group">
+                        <label for="signup-name">Full Name:</label>
+                        <input type="text" id="signup-name" placeholder="Enter your full name">
+                    </div>
+                    <div class="input-group">
+                        <label for="signup-role">Role:</label>
+                        <select id="signup-role">
+                            <option value="student">Student</option>
+                            <option value="teacher">Teacher</option>
+                        </select>
+                    </div>
+                    <button onclick="handleSignup()">Sign Up</button>
+                    <div id="signup-spinner" class="loading hidden"></div>
+                    <div id="signup-response" class="response hidden">
+                        <div class="status" id="signup-status"></div>
+                        <pre id="signup-result"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Course & Syllabus Tab -->
+        <div class="tab-content" id="syllabus">
+            <div class="endpoint-section">
+                <h2 class="endpoint-title">Create Course from Syllabus</h2>
+                <div class="input-group">
+                    <label for="syllabus-title">Course Title:</label>
+                    <input type="text" id="syllabus-title" placeholder="Introduction to Computer Science" value="Computer Science 101">
+                </div>
+                <div class="input-group">
+                    <label for="syllabus-content">Syllabus Content:</label>
+                    <textarea id="syllabus-content" rows="15" placeholder="Paste your syllabus content here..."></textarea>
+                </div>
+                <button onclick="createCourseFromSyllabus()">Create Course</button>
+                <div id="syllabus-spinner" class="loading hidden"></div>
+                <div id="syllabus-response" class="response hidden">
+                    <div class="status" id="syllabus-status"></div>
+                    <pre id="syllabus-result"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Quiz Tab -->
+        <div class="tab-content" id="quiz">
+            <div class="endpoint-section">
+                <h2 class="endpoint-title">Generate Topic Quiz</h2>
+                
+                <!-- Subject Selection -->
+                <div class="input-group">
+                    <label for="quiz-subject-select">Select Subject:</label>
+                    <select id="quiz-subject-select" onchange="loadModulesForSubject()">
+                        <option value="">-- Select a Subject --</option>
+                        <!-- Will be populated from API -->
+                    </select>
+                </div>
+                
+                <!-- Module Selection (appears after subject is selected) -->
+                <div class="input-group" id="module-selection" style="display: none;">
+                    <label for="quiz-module-select">Select Module:</label>
+                    <select id="quiz-module-select" onchange="loadTopicsForModule()">
+                        <option value="">-- Select a Module --</option>
+                        <!-- Will be populated from API -->
+                    </select>
+                </div>
+                
+                <!-- Topic Selection (appears after module is selected) -->
+                <div class="input-group" id="topic-selection" style="display: none;">
+                    <label for="quiz-topic-select">Select Topic:</label>
+                    <select id="quiz-topic-select">
+                        <option value="">-- Select a Topic --</option>
+                        <!-- Will be populated from API -->
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="quiz-questions">Number of Questions:</label>
+                    <input type="number" id="quiz-questions" min="1" max="10" value="3">
+                </div>
+                
+                <button onclick="generateTopicQuiz()" id="generate-quiz-btn">Generate Quiz</button>
+                <div id="quiz-spinner" class="loading hidden"></div>
+                <div id="quiz-response" class="response hidden">
+                    <div class="status" id="quiz-status"></div>
+                    <pre id="quiz-result"></pre>
+                </div>
+            </div>
+            
+            <!-- Quiz Display and Interaction Section -->
+            <div class="endpoint-section" id="quiz-display-section" style="display: none;">
+                <h2 class="endpoint-title">Take Quiz</h2>
+                <div id="quiz-progress">
+                    Question <span id="current-question">1</span> of <span id="total-questions">0</span>
+                </div>
+                
+                <div id="question-container">
+                    <h3 id="question-text"></h3>
+                    <div id="options-container" class="options-list">
+                        <!-- Options will be inserted here -->
+                    </div>
+                </div>
+                
+                <div class="button-row">
+                    <button onclick="submitQuizAnswer()" id="submit-answer-btn">Submit Answer</button>
+                    <button onclick="nextQuestion()" id="next-question-btn" style="display: none;">Next Question</button>
+                    <button onclick="finishQuiz()" id="finish-quiz-btn" style="display: none;">Finish Quiz</button>
+                </div>
+                
+                <div id="answer-feedback" class="hidden">
+                    <div id="feedback-text"></div>
+                    <div id="explanation-text"></div>
+                </div>
+                
+                <!-- Results will appear here after quiz completion -->
+                <div id="quiz-results" class="hidden">
+                    <h3>Quiz Results</h3>
+                    <div id="score-display"></div>
+                    <div id="bkt-update"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Assignment Tab -->
+        <div class="tab-content" id="assignment">
+            <div class="endpoint-section">
+                <h2 class="endpoint-title">Generate Topic Assignment</h2>
+                <div class="input-group">
+                    <label for="assignment-subject">Subject Name:</label>
+                    <input type="text" id="assignment-subject" value="Computer Science">
+                </div>
+                <div class="input-group">
+                    <label for="assignment-module">Module Name:</label>
+                    <input type="text" id="assignment-module" value="Programming Fundamentals">
+                </div>
+                <div class="input-group">
+                    <label for="assignment-topic">Topic Name:</label>
+                    <input type="text" id="assignment-topic" value="Variables and Data Types">
+                </div>
+                <div class="input-group">
+                    <label for="assignment-questions">Number of Questions:</label>
+                    <input type="number" id="assignment-questions" min="1" max="5" value="3">
+                </div>
+                <button onclick="generateTopicAssignment()">Generate Assignment</button>
+                <div id="assignment-spinner" class="loading hidden"></div>
+                <div id="assignment-response" class="response hidden">
+                    <div class="status" id="assignment-status"></div>
+                    <pre id="assignment-result"></pre>
+                </div>
+            </div>
+            
+            <div class="endpoint-section">
+                <h2 class="endpoint-title">Generate Multi-Topic Assignment</h2>
+                <div class="input-group">
+                    <label for="multi-subject-id">Subject ID:</label>
+                    <input type="text" id="multi-subject-id" value="cs101">
+                </div>
+                <div class="input-group">
+                    <label for="multi-topics">Number of Topics:</label>
+                    <input type="number" id="multi-topics" min="1" max="5" value="3">
+                </div>
+                <div class="input-group">
+                    <label for="multi-questions">Questions per Topic:</label>
+                    <input type="number" id="multi-questions" min="1" max="5" value="2">
+                </div>
+                <button onclick="generateMultiTopicAssignment()">Generate Multi-Topic Assignment</button>
+                <div id="multi-spinner" class="loading hidden"></div>
+                <div id="multi-response" class="response hidden">
+                    <div class="status" id="multi-status"></div>
+                    <pre id="multi-result"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Question Paper Tab -->
+        <div class="tab-content" id="question-paper">
+            <div class="endpoint-section">
+                <h2 class="endpoint-title">Generate Question Paper</h2>
+                <div class="input-group">
+                    <label for="paper-subject-id">Subject ID:</label>
+                    <input type="text" id="paper-subject-id" value="cs101">
+                </div>
+                <div class="input-group">
+                    <label for="paper-text">Past Paper Text (optional reference):</label>
+                    <textarea id="paper-text" placeholder="Paste past paper content here for reference..."></textarea>
+                </div>
+                <button onclick="generateQuestionPaper()">Generate Question Paper</button>
+                <div id="paper-spinner" class="loading hidden"></div>
+                <div id="paper-response" class="response hidden">
+                    <div class="status" id="paper-status"></div>
+                    <pre id="paper-result"></pre>
+                </div>
+            </div>
+            
+            <div class="endpoint-section">
+                <h2 class="endpoint-title">List Generated Question Papers</h2>
+                <button onclick="listQuestionPapers()">List Papers</button>
+                <div id="paper-list-spinner" class="loading hidden"></div>
+                <div id="paper-list-response" class="response hidden">
+                    <div class="status" id="paper-list-status"></div>
+                    <pre id="paper-list-result"></pre>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Student Progress Tab -->
+        <div class="tab-content" id="student">
+            <div class="endpoint-section">
+                <h2 class="endpoint-title">Get Student BKT Parameters</h2>
+                <div class="input-group">
+                    <label for="bkt-topic">Topic ID:</label>
+                    <input type="text" id="bkt-topic" value="computer_science-programming_fundamentals-variables_and_data_types">
+                </div>
+                <button onclick="getStudentBKTParams()">Get BKT Parameters</button>
+                <div id="bkt-spinner" class="loading hidden"></div>
+                <div id="bkt-response" class="response hidden">
+                    <div class="status" id="bkt-status"></div>
+                    <pre id="bkt-result"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // API Base URL
+        const API_URL = 'http://localhost:8000'; // Change this to match your API server
+        
+        // Auth state management
+        let currentUser = JSON.parse(localStorage.getItem('currentUser')) || null;
+        let authToken = localStorage.getItem('authToken') || null;
+        
+        // Initialize the UI based on auth state
+        document.addEventListener('DOMContentLoaded', function() {
+            updateAuthUI();
+            
+            // Set first tab active
+            if (currentUser) {
+                // If logged in, go to syllabus tab by default
+                setActiveTab('syllabus');
+            } else {
+                // If not logged in, go to auth tab by default
+                setActiveTab('auth');
+            }
+        });
+        
+        // Add click handlers to all tab buttons
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const tabId = this.getAttribute('data-tab');
+                setActiveTab(tabId);
+            });
+        });
+        
+        // Tab switching
+        function setActiveTab(tabId) {
+            // Deactivate all tabs
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            
+            // Activate selected tab
+            document.querySelector(`.tab[data-tab="${tabId}"]`).classList.add('active');
+            document.getElementById(tabId).classList.add('active');
+        }
+        
+        // Toggle between login and signup forms
+        function toggleAuthMode(mode) {
+            if (mode === 'login') {
+                document.getElementById('login-form').classList.remove('hidden');
+                document.getElementById('signup-form').classList.add('hidden');
+                document.getElementById('login-toggle').classList.add('active');
+                document.getElementById('signup-toggle').classList.remove('active');
+            } else {
+                document.getElementById('login-form').classList.add('hidden');
+                document.getElementById('signup-form').classList.remove('hidden');
+                document.getElementById('login-toggle').classList.remove('active');
+                document.getElementById('signup-toggle').classList.add('active');
+            }
+        }
+        
+        // Update the UI based on auth state
+        function updateAuthUI() {
+            if (currentUser && authToken) {
+                // User is logged in
+                document.getElementById('user-content-logged-out').classList.add('hidden');
+                document.getElementById('user-content-logged-in').classList.remove('hidden');
+                document.getElementById('user-info').classList.add('logged-in');
+                
+                // Update user info display
+                document.getElementById('user-name').textContent = currentUser.fullName || currentUser.email;
+                
+                // Update role badge
+                const roleBadge = document.getElementById('user-role-badge');
+                roleBadge.textContent = currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1);
+                roleBadge.className = 'user-badge ' + currentUser.role.toLowerCase();
+            } else {
+                // User is logged out
+                document.getElementById('user-content-logged-out').classList.remove('hidden');
+                document.getElementById('user-content-logged-in').classList.add('hidden');
+                document.getElementById('user-info').classList.remove('logged-in');
+            }
+            
+            // Update the student ID field visibility
+            const studentFields = document.querySelectorAll('.student-id-field');
+            studentFields.forEach(field => {
+                if (currentUser && currentUser.role === 'student') {
+                    field.classList.add('hidden');
+                } else {
+                    field.classList.remove('hidden');
+                }
+            });
+        }
+        
+        // Helper functions for showing loading and responses
+        function showLoading(elementId) {
+            document.getElementById(`${elementId}-spinner`).classList.remove('hidden');
+        }
+        
+        function hideLoading(elementId) {
+            document.getElementById(`${elementId}-spinner`).classList.add('hidden');
+        }
+        
+        function showResponse(elementId, status, isSuccess, data) {
+            const responseElement = document.getElementById(`${elementId}-response`);
+            const statusElement = document.getElementById(`${elementId}-status`);
+            const resultElement = document.getElementById(`${elementId}-result`);
+            
+            responseElement.classList.remove('hidden');
+            statusElement.className = 'status ' + (isSuccess ? 'success' : 'error');
+            statusElement.textContent = status;
+            
+            try {
+                const formattedData = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+                resultElement.textContent = formattedData;
+            } catch (e) {
+                resultElement.textContent = data;
+            }
+        }
+        
+        // Authentication Functions
+        async function handleSignup() {
+            showLoading('signup');
+            
+            try {
+                const email = document.getElementById('signup-email').value;
+                const password = document.getElementById('signup-password').value;
+                const fullName = document.getElementById('signup-name').value;
+                const role = document.getElementById('signup-role').value;
+                
+                if (!email || !password || !fullName) {
+                    throw new Error('Please fill in all required fields');
+                }
+                
+                const response = await fetch(`${API_URL}/signup`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        email,
+                        password,
+                        full_name: fullName,
+                        role
+                    }),
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResponse('signup', 'Account created successfully', true, data);
+                    // Switch to login form after successful signup
+                    setTimeout(() => toggleAuthMode('login'), 2000);
+                } else {
+                    showResponse('signup', 'Registration failed', false, data);
+                }
+            } catch (error) {
+                showResponse('signup', 'Error', false, error.message);
+            } finally {
+                hideLoading('signup');
+            }
+        }
+        
+        async function handleLogin() {
+            showLoading('login');
+            
+            try {
+                const email = document.getElementById('login-email').value;
+                const password = document.getElementById('login-password').value;
+                
+                if (!email || !password) {
+                    throw new Error('Please enter both email and password');
+                }
+                
+                // Create form data for login endpoint
+                const formData = new FormData();
+                formData.append('username', email);
+                formData.append('password', password);
+                
+                const response = await fetch(`${API_URL}/login`, {
+                    method: 'POST',
+                    body: formData,
+                });
+                
+                // Parse the response as JSON
+                const data = await response.json().catch(() => ({}));
+                
+                if (response.ok) {
+                    // Handle successful login
+                    localStorage.setItem('currentUser', JSON.stringify(data));
+                    currentUser = data;
+                    
+                    showResponse('login', 'Login successful', true, data);
+                    updateAuthUI();
+                    setTimeout(() => setActiveTab('syllabus'), 1000);
+                } else {
+                    // Improved error handling
+                    const errorMessage = data.detail || 
+                                         data.message || 
+                                         'Login failed with status: ' + response.status;
+                    showResponse('login', 'Login failed', false, { error: errorMessage });
+                }
+            } catch (error) {
+                showResponse('login', 'Error', false, { error: error.message });
+            } finally {
+                hideLoading('login');
+            }
+        }
+        
+        function handleLogout() {
+            // Clear auth data
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('currentUser');
+            authToken = null;
+            currentUser = null;
+            
+            // Update UI
+            updateAuthUI();
+            
+            // Go to auth tab
+            setActiveTab('auth');
+            toggleAuthMode('login');
+        }
+        
+        // API Call Functions
+        async function createCourseFromSyllabus() {
+            if (!currentUser) {
+                alert('Please login first');
+                setActiveTab('auth');
+                return;
+            }
+            
+            showLoading('syllabus');
+            
+            try {
+                const title = document.getElementById('syllabus-title').value;
+                const syllabusText = document.getElementById('syllabus-content').value;
+                
+                if (!syllabusText || syllabusText.trim() === '') {
+                    throw new Error('Syllabus content is empty. Please enter the syllabus text.');
+                }
+                
+                const formData = new FormData();
+                formData.append('syllabus_text', syllabusText);
+                formData.append('title', title);
+                formData.append('teacher_id', currentUser.id);
+                
+                const response = await fetch(`${API_URL}/create-course-from-syllabus`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`
+                    },
+                    body: formData
+                });
+                
+                const data = await response.json();
+                showResponse('syllabus', `Status: ${response.status}`, response.ok, data);
+            } catch (error) {
+                showResponse('syllabus', 'Error', false, error.message);
+            } finally {
+                hideLoading('syllabus');
+            }
+        }
+        
+        async function generateTopicQuiz() {
+            if (!currentUser) {
+                alert('Please login first');
+                setActiveTab('auth');
+                return;
+            }
+            
+            showLoading('quiz');
+            
+            try {
+                const topicSelect = document.getElementById('quiz-topic-select');
+                const topicId = topicSelect.value;
+                
+                if (!topicId) {
+                    throw new Error('Please select a topic');
+                }
+                
+                const numQuestions = document.getElementById('quiz-questions').value;
+                
+                const response = await fetch(`${API_URL}/generate-quiz`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    },
+                    body: JSON.stringify({
+                        student_id: currentUser.id,
+                        topic_id: topicId,
+                        num_questions: parseInt(numQuestions)
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to generate quiz: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Store current quiz
+                currentQuiz = data;
+                currentQuestionIndex = 0;
+                userAnswers = [];
+                
+                // Display the quiz
+                displayQuiz();
+                
+                // Show response in debug area
+                showResponse('quiz', 'Quiz generated successfully', true, data);
+                
+            } catch (error) {
+                showResponse('quiz', 'Error', false, error.message);
+            } finally {
+                hideLoading('quiz');
+            }
+        }
+        
+        // Variables to store current quiz state
+        let currentQuiz = null;
+        let currentQuestionIndex = 0;
+        let userAnswers = [];
+        let selectedOption = null;
+        
+        // Function to load all available subjects
+        async function loadSubjects() {
+            if (!currentUser) {
+                alert('Please login first');
+                setActiveTab('auth');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/subjects`, {
+                    headers: {
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load subjects: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const subjectSelect = document.getElementById('quiz-subject-select');
+                
+                // Clear existing options except the first one
+                while (subjectSelect.options.length > 1) {
+                    subjectSelect.options.remove(1);
+                }
+                
+                // Add subjects to dropdown
+                data.subjects.forEach(subject => {
+                    const option = document.createElement('option');
+                    option.value = subject.id;
+                    option.textContent = subject.name;
+                    subjectSelect.appendChild(option);
+                });
+                
+            } catch (error) {
+                console.error('Error loading subjects:', error);
+                alert('Failed to load subjects. Please try again.');
+            }
+        }
+        
+        // Function to load modules for selected subject
+        async function loadModulesForSubject() {
+            const subjectSelect = document.getElementById('quiz-subject-select');
+            const subjectId = subjectSelect.value;
+            
+            if (!subjectId) {
+                document.getElementById('module-selection').style.display = 'none';
+                document.getElementById('topic-selection').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/subjects/${subjectId}/modules`, {
+                    headers: {
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load modules: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const moduleSelect = document.getElementById('quiz-module-select');
+                
+                // Clear existing options except the first one
+                while (moduleSelect.options.length > 1) {
+                    moduleSelect.options.remove(1);
+                }
+                
+                // Add modules to dropdown
+                data.modules.forEach(module => {
+                    const option = document.createElement('option');
+                    option.value = module.id;
+                    option.textContent = module.name;
+                    moduleSelect.appendChild(option);
+                });
+                
+                // Show module selection
+                document.getElementById('module-selection').style.display = 'block';
+                // Hide topic selection until module is selected
+                document.getElementById('topic-selection').style.display = 'none';
+                
+            } catch (error) {
+                console.error('Error loading modules:', error);
+                alert('Failed to load modules. Please try again.');
+            }
+        }
+        
+        // Function to load topics for selected module
+        async function loadTopicsForModule() {
+            const moduleSelect = document.getElementById('quiz-module-select');
+            const moduleId = moduleSelect.value;
+            
+            if (!moduleId) {
+                document.getElementById('topic-selection').style.display = 'none';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API_URL}/modules/${moduleId}/topics`, {
+                    headers: {
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to load topics: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const topicSelect = document.getElementById('quiz-topic-select');
+                
+                // Clear existing options except the first one
+                while (topicSelect.options.length > 1) {
+                    topicSelect.options.remove(1);
+                }
+                
+                // Add topics to dropdown
+                data.topics.forEach(topic => {
+                    const option = document.createElement('option');
+                    option.value = topic.id;
+                    option.textContent = topic.name;
+                    topicSelect.appendChild(option);
+                });
+                
+                // Show topic selection
+                document.getElementById('topic-selection').style.display = 'block';
+                
+            } catch (error) {
+                console.error('Error loading topics:', error);
+                alert('Failed to load topics. Please try again.');
+            }
+        }
+        
+        // Function to display the current quiz
+        function displayQuiz() {
+            if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
+                return;
+            }
+            
+            // Show quiz section
+            document.getElementById('quiz-display-section').style.display = 'block';
+            
+            // Update progress
+            document.getElementById('total-questions').textContent = currentQuiz.questions.length;
+            document.getElementById('current-question').textContent = currentQuestionIndex + 1;
+            
+            // Get current question
+            const question = currentQuiz.questions[currentQuestionIndex];
+            
+            // Display question
+            document.getElementById('question-text').textContent = question.question;
+            
+            // Clear options container
+            const optionsContainer = document.getElementById('options-container');
+            optionsContainer.innerHTML = '';
+            
+            // Add options
+            question.options.forEach((option, index) => {
+                // Parse option text from "A) Option text" format
+                const optionLetter = option.substring(0, 1);
+                const optionText = option.substring(3);
+                
+                const optionElement = document.createElement('div');
+                optionElement.className = 'quiz-option';
+                optionElement.dataset.letter = optionLetter;
+                
+                optionElement.innerHTML = `
+                    <div class="option-letter">${optionLetter}</div>
+                    <div class="option-text">${optionText}</div>
+                `;
+                
+                // Add click handler
+                optionElement.addEventListener('click', () => {
+                    // Deselect all options
+                    document.querySelectorAll('.quiz-option').forEach(el => {
+                        el.classList.remove('selected');
+                    });
+                    
+                    // Select this option
+                    optionElement.classList.add('selected');
+                    selectedOption = optionLetter;
+                });
+                
+                optionsContainer.appendChild(optionElement);
+            });
+            
+            // Reset UI state
+            document.getElementById('answer-feedback').classList.add('hidden');
+            document.getElementById('submit-answer-btn').style.display = 'block';
+            document.getElementById('next-question-btn').style.display = 'none';
+            document.getElementById('finish-quiz-btn').style.display = 'none';
+            selectedOption = null;
+        }
+        
+        // Function to submit answer for current question
+        async function submitQuizAnswer() {
+            if (!selectedOption) {
+                alert('Please select an answer');
+                return;
+            }
+            
+            const question = currentQuiz.questions[currentQuestionIndex];
+            const isCorrect = selectedOption === question.answer;
+            
+            // Store the answer
+            userAnswers.push({
+                questionIndex: currentQuestionIndex,
+                selectedOption: selectedOption,
+                isCorrect: isCorrect
+            });
+            
+            // Show feedback
+            const feedbackText = document.getElementById('feedback-text');
+            feedbackText.textContent = isCorrect ? 
+                '✅ Correct!' : 
+                `❌ Incorrect. The correct answer is ${question.answer}.`;
+            
+            // Show explanation if available
+            if (question.explanation) {
+                document.getElementById('explanation-text').textContent = question.explanation;
+            } else {
+                document.getElementById('explanation-text').textContent = '';
+            }
+            
+            document.getElementById('answer-feedback').classList.remove('hidden');
+            
+            // Update BKT with the answer
+            try {
+                // Extract topic ID from quiz
+                const topicId = currentQuiz.topic_id || document.getElementById('quiz-topic-select').value;
+                
+                const response = await fetch(`${API_URL}/submit-quiz-response`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    },
+                    body: JSON.stringify({
+                        student_id: currentUser.id,
+                        topic_id: topicId,
+                        is_correct: isCorrect
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.error('Failed to update BKT parameters');
+                }
+                
+            } catch (error) {
+                console.error('Error updating BKT parameters:', error);
+            }
+            
+            // Show next button or finish button
+            document.getElementById('submit-answer-btn').style.display = 'none';
+            
+            if (currentQuestionIndex < currentQuiz.questions.length - 1) {
+                document.getElementById('next-question-btn').style.display = 'block';
+            } else {
+                document.getElementById('finish-quiz-btn').style.display = 'block';
+            }
+        }
+        
+        // Function to move to next question
+        function nextQuestion() {
+            currentQuestionIndex++;
+            displayQuiz();
+        }
+        
+        // Function to finish the quiz and show results
+        async function finishQuiz() {
+            // Calculate score
+            const correctAnswers = userAnswers.filter(answer => answer.isCorrect).length;
+            const totalQuestions = currentQuiz.questions.length;
+            const scorePercentage = Math.round((correctAnswers / totalQuestions) * 100);
+            
+            // Get updated BKT parameters
+            let bktParams = null;
+            try {
+                const topicId = currentQuiz.topic_id || document.getElementById('quiz-topic-select').value;
+                
+                const response = await fetch(`${API_URL}/student/${currentUser.id}/bkt/${topicId}`, {
+                    headers: {
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (response.ok) {
+                    bktParams = await response.json();
+                }
+            } catch (error) {
+                console.error('Error fetching BKT parameters:', error);
+            }
+            
+            // Hide quiz display
+            document.getElementById('question-container').style.display = 'none';
+            document.getElementById('answer-feedback').classList.add('hidden');
+            document.getElementById('finish-quiz-btn').style.display = 'none';
+            
+            // Show results
+            const resultsDiv = document.getElementById('quiz-results');
+            resultsDiv.classList.remove('hidden');
+            
+            // Display score
+            document.getElementById('score-display').innerHTML = `
+                <div class="score-circle ${scorePercentage >= 70 ? 'high-score' : scorePercentage >= 50 ? 'medium-score' : 'low-score'}">
+                    ${scorePercentage}%
+                </div>
+                <p>You got ${correctAnswers} out of ${totalQuestions} questions correct.</p>
+            `;
+            
+            // Display BKT update if available
+            if (bktParams) {
+                document.getElementById('bkt-update').innerHTML = `
+                    <h4>Your Knowledge Model:</h4>
+                    <p>Current mastery level: ${(bktParams.mastery_probability * 100).toFixed(1)}%</p>
+                    <p>Learning rate: ${(bktParams.learning_rate * 100).toFixed(1)}%</p>
+                `;
+            } else {
+                document.getElementById('bkt-update').textContent = '';
+            }
+            
+            // Reset quiz state
+            currentQuiz = null;
+            currentQuestionIndex = 0;
+            userAnswers = [];
+        }
+        
+        // Load subjects when the quiz tab is activated
+        document.querySelector('.tab[data-tab="quiz"]').addEventListener('click', function() {
+            if (currentUser) {
+                loadSubjects();
+            }
+        });
+    </script>
+</body>
+</html>

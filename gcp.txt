@@ -1,0 +1,632 @@
+import os
+import uuid
+import json
+import shutil
+import requests
+from typing import List, Dict, Optional, Any
+from fastapi import FastAPI, HTTPException, File, UploadFile, Depends
+from fastapi.security import OAuth2PasswordBearer
+from pydantic import BaseModel, Field
+from datetime import datetime
+from fastapi.middleware.cors import CORSMiddleware
+from langchain_community.document_loaders import PyPDFLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_chroma import Chroma
+from langchain_community.embeddings import OllamaEmbeddings
+from langchain_ollama import OllamaLLM
+from firebase_admin import credentials, firestore, auth, initialize_app, exceptions
+
+# ==============================================================================
+# 1. Configuration & Initialization
+# ==============================================================================
+
+# --- IMPORTANT: These variables are provided by the hosting environment ---
+__app_id = "default-app-id"
+__firebase_config = "{}"
+
+# Initialize Firebase Admin SDK
+try:
+    if not __firebase_config:
+        raise ValueError("Firebase config is empty. Please provide a valid configuration.")
+    cred = credentials.Certificate(json.loads(__firebase_config))
+    firebase_app = initialize_app(cred)
+    db = firestore.client()
+    print("Firebase Admin SDK initialized successfully.")
+except ValueError as e:
+    print(f"Error initializing Firebase: {e}")
+except exceptions.FirebaseError as e:
+    print(f"Firebase Admin SDK Error: {e}")
+
+# Ollama LLM and Embeddings Configuration
+OLLAMA_LLM_MODEL = "phi3:mini"
+OLLAMA_EMBEDDING_MODEL = "nomic-embed-text"
+OLLAMA_BASE_URL = "http://localhost:11434"
+
+# Initialize Ollama Models
+llm = OllamaLLM(model=OLLAMA_LLM_MODEL, base_url=OLLAMA_BASE_URL)
+embedding_model = OllamaEmbeddings(model=OLLAMA_EMBEDDING_MODEL, base_url=OLLAMA_BASE_URL)
+
+# RAG Data Directories
+RAG_DATA_DIR = "./rag_data"
+DB_DIR = os.path.join(RAG_DATA_DIR, "vector_db")
+
+os.makedirs(DB_DIR, exist_ok=True)
+
+# FastAPI App
+app = FastAPI(title="AI-Powered Education Platform API")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ==============================================================================
+# 2. Pydantic Models for Data Validation
+# ==============================================================================
+
+class User(BaseModel):
+    uid: str
+    email: str
+    role: str # "student" or "teacher"
+
+class Subject(BaseModel):
+    id: str
+    name: str
+    teacher_id: str
+    created_at: str
+
+class Module(BaseModel):
+    id: str
+    name: str
+    subject_id: str
+    created_at: str
+
+class Topic(BaseModel):
+    id: str
+    name: str
+    module_id: str
+    pdf_path: Optional[str] = None
+    created_at: str
+
+class QuizRequest(BaseModel):
+    student_id: str
+    topic_id: str
+    num_questions: int = 5
+
+class QuizAnswer(BaseModel):
+    student_id: str
+    topic_id: str
+    question_id: str
+    is_correct: bool
+
+class ExamPaperRequest(BaseModel):
+    subject_id: str
+    difficulty: str = "medium"
+    num_questions: int = 10
+
+class Question(BaseModel):
+    question: str
+    options: List[str]
+    answer: str
+
+class QuizResponse(BaseModel):
+    topic_id: str
+    questions: List[Question]
+
+class ExamPaper(BaseModel):
+    subject_id: str
+    questions: List[Question]
+    teacher_id: str
+    created_at: str
+
+class ConfidenceScore(BaseModel):
+    topic_id: str
+    score: float # 0.0 to 1.0
+
+# New Pydantic Models for Assignments
+class AssignmentQuestion(BaseModel):
+    question: str
+    answer_format: str # e.g., "short answer", "essay"
+    student_answer: Optional[str] = None
+    ai_feedback: Optional[str] = None
+
+class Assignment(BaseModel):
+    id: str
+    topic_id: str
+    student_id: str
+    questions: List[AssignmentQuestion]
+    created_at: str
+
+class AssignmentSubmission(BaseModel):
+    assignment_id: str
+    question_id: str
+    student_answer: str
+
+# ==============================================================================
+# 3. Authentication & Dependency Injection
+# ==============================================================================
+
+# Custom dependency to get current user from Firebase Auth token
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        # Verify the Firebase ID token
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
+        # Fetch user document from Firestore to get their role
+        user_doc = await db.collection('users').document(uid).get()
+        if not user_doc.exists:
+            raise HTTPException(status_code=404, detail="User not found")
+        user_data = user_doc.to_dict()
+        return User(uid=uid, email=user_data['email'], role=user_data['role'])
+    except exceptions.FirebaseError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid authentication token: {e}")
+    except ValueError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token format: {e}")
+    except HTTPException as e:
+        raise e
+
+# ==============================================================================
+# 4. RAG and LLM Functions
+# ==============================================================================
+
+def get_chroma_db_for_topic(topic_id: str):
+    """Initializes and returns a Chroma DB instance for a given topic."""
+    return Chroma(
+        persist_directory=os.path.join(DB_DIR, topic_id),
+        embedding_function=embedding_model
+    )
+
+def process_pdf_for_rag(file_path: str, topic_id: str):
+    """
+    Loads, chunks, and embeds a PDF document.
+    Stores the embeddings in a Chroma vector database specific to the topic.
+    """
+    print(f"Processing PDF for topic ID: {topic_id}")
+    try:
+        loader = PyPDFLoader(file_path)
+        documents = loader.load()
+
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            length_function=len
+        )
+        chunks = text_splitter.split_documents(documents)
+        print(f"Split PDF into {len(chunks)} chunks.")
+
+        # Delete any existing DB for this topic to avoid duplication
+        db_path = os.path.join(DB_DIR, topic_id)
+        if os.path.exists(db_path):
+            shutil.rmtree(db_path)
+
+        # Create new vector DB
+        Chroma.from_documents(
+            documents=chunks,
+            embedding=embedding_model,
+            persist_directory=db_path
+        )
+        print("Vector database created successfully.")
+    except Exception as e:
+        print(f"Error processing PDF for RAG: {e}")
+        raise HTTPException(status_code=500, detail=f"Could not process PDF: {e}")
+
+def ask_llm_with_rag(query: str, topic_id: str, is_assignment: bool = False) -> str:
+    """
+    Performs a RAG query:
+    1. Retrieves relevant documents from the topic's vector DB.
+    2. Formats a prompt with the context.
+    3. Calls the Ollama LLM to generate a response.
+    """
+    db = get_chroma_db_for_topic(topic_id)
+    retriever = db.as_retriever()
+    
+    # Retrieve relevant documents based on the query
+    docs = retriever.get_relevant_documents(query)
+    context = "\n\n".join([doc.page_content for doc in docs])
+
+    if not context:
+        raise HTTPException(status_code=404, detail="No relevant information found in the textbook for this topic.")
+        
+    if is_assignment:
+        prompt = (
+            f"You are an AI assistant for a student assignment. Your task is to generate "
+            f"detailed, open-ended questions based on the provided context from a textbook. "
+            f"The answer format should be either 'short answer' or 'essay'. "
+            f"Only provide a JSON array of objects, with each object having a 'question' and an 'answer_format' field. "
+            f"Context: {context}\n\n"
+            f"Query: {query}\n\n"
+        )
+    else:
+        prompt = (
+            f"You are an AI assistant for a student quiz. Your task is to generate questions and answers based on the provided "
+            f"context from a textbook. The questions should be clear, and the answers must be directly derivable from the context. "
+            f"Only provide a JSON array of objects with a 'question', 'options', and 'answer' field. Do not include any other text in the response. "
+            f"Context: {context}\n\n"
+            f"Query: {query}"
+        )
+
+    try:
+        response = llm.invoke(prompt)
+        return json.loads(response)
+    except Exception as e:
+        print(f"Ollama LLM request failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to generate content: {e}")
+
+def ask_llm_for_feedback(student_answer: str, original_context: str, correct_answer: str) -> str:
+    """
+    Asks the LLM to evaluate a student's answer and provide constructive feedback.
+    """
+    prompt = (
+        f"You are an AI tutor. Your task is to analyze a student's answer and compare it to the correct answer. "
+        f"Provide detailed, constructive feedback on their response, highlighting what they did well, what they got wrong, "
+        f"and how they can improve. The feedback should be encouraging and specific. Do not simply say 'correct' or 'incorrect'.\n\n"
+        f"Original Context:\n{original_context}\n\n"
+        f"Correct Answer:\n{correct_answer}\n\n"
+        f"Student's Answer:\n{student_answer}\n\n"
+        f"Provide detailed feedback on the student's answer based on the context and correct answer."
+    )
+
+    try:
+        response = llm.invoke(prompt)
+        return response
+    except Exception as e:
+        print(f"Failed to get feedback from Ollama LLM: {e}")
+        return "Failed to generate feedback due to an internal error."
+
+# ==============================================================================
+# 5. User Endpoints (Sign-up, Login)
+# ==============================================================================
+
+class SignUpRequest(BaseModel):
+    email: str
+    password: str
+    role: str # "student" or "teacher"
+
+@app.post("/signup")
+async def signup(request: SignUpRequest):
+    """Registers a new user (student or teacher) with Firebase Auth and Firestore."""
+    try:
+        # Create user in Firebase Authentication
+        user_record = auth.create_user(
+            email=request.email,
+            password=request.password,
+            display_name=request.role # Use display name to store role
+        )
+
+        # Store user role and metadata in Firestore
+        user_ref = db.collection('users').document(user_record.uid)
+        await user_ref.set({
+            'email': request.email,
+            'role': request.role,
+            'created_at': datetime.utcnow()
+        })
+        
+        return {"message": "User registered successfully.", "uid": user_record.uid}
+    except exceptions.FirebaseError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"An unexpected error occurred: {e}")
+
+# Note: The login endpoint is handled by Firebase Client SDK on the frontend.
+# The backend only needs to verify the token for subsequent requests.
+
+# ==============================================================================
+# 6. Teacher-specific Endpoints
+# ==============================================================================
+
+@app.post("/subjects")
+async def create_subject(name: str, current_user: User = Depends(get_current_user)):
+    """Allows a teacher to create a new subject."""
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Permission denied. Only teachers can create subjects.")
+    
+    subject_ref = db.collection('subjects').document()
+    subject_data = {
+        "id": subject_ref.id,
+        "name": name,
+        "teacher_id": current_user.uid,
+        "created_at": datetime.utcnow()
+    }
+    await subject_ref.set(subject_data)
+    return Subject(**subject_data)
+
+@app.post("/subjects/{subject_id}/modules")
+async def add_module_to_subject(subject_id: str, name: str, current_user: User = Depends(get_current_user)):
+    """Adds a module to a subject."""
+    # Check if the user is the teacher of this subject
+    subject_doc = await db.collection('subjects').document(subject_id).get()
+    if not subject_doc.exists or subject_doc.to_dict().get('teacher_id') != current_user.uid:
+        raise HTTPException(status_code=403, detail="Permission denied.")
+
+    module_ref = db.collection('modules').document()
+    module_data = {
+        "id": module_ref.id,
+        "name": name,
+        "subject_id": subject_id,
+        "created_at": datetime.utcnow()
+    }
+    await module_ref.set(module_data)
+    return Module(**module_data)
+
+@app.post("/modules/{module_id}/topics")
+async def add_topic_to_module(module_id: str, name: str, current_user: User = Depends(get_current_user)):
+    """Adds a topic to a module."""
+    # Check if the user is the teacher of the parent subject
+    module_doc = await db.collection('modules').document(module_id).get()
+    if not module_doc.exists:
+        raise HTTPException(status_code=404, detail="Module not found.")
+    
+    subject_id = module_doc.to_dict().get('subject_id')
+    subject_doc = await db.collection('subjects').document(subject_id).get()
+    if subject_doc.to_dict().get('teacher_id') != current_user.uid:
+        raise HTTPException(status_code=403, detail="Permission denied.")
+
+    topic_ref = db.collection('topics').document()
+    topic_data = {
+        "id": topic_ref.id,
+        "name": name,
+        "module_id": module_id,
+        "created_at": datetime.utcnow()
+    }
+    await topic_ref.set(topic_data)
+    return Topic(**topic_data)
+
+@app.post("/topics/{topic_id}/upload-pdf")
+async def upload_textbook_for_topic(topic_id: str, file: UploadFile = File(...), current_user: User = Depends(get_current_user)):
+    """
+    Uploads a PDF textbook for a specific topic, processing it for RAG.
+    """
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Permission denied.")
+
+    topic_doc = await db.collection('topics').document(topic_id).get()
+    if not topic_doc.exists:
+        raise HTTPException(status_code=404, detail="Topic not found.")
+    
+    # Save the PDF file temporarily
+    file_location = os.path.join(RAG_DATA_DIR, f"{topic_id}_{file.filename}")
+    with open(file_location, "wb+") as file_object:
+        shutil.copyfileobj(file.file, file_object)
+
+    # Process the PDF for RAG
+    try:
+        process_pdf_for_rag(file_location, topic_id)
+        # Update the topic document with the PDF path
+        await db.collection('topics').document(topic_id).update({"pdf_path": file_location})
+    except Exception as e:
+        os.remove(file_location) # Clean up file on failure
+        raise HTTPException(status_code=500, detail=f"Failed to process PDF: {e}")
+    finally:
+        file.file.close()
+    
+    return {"message": "PDF uploaded and processed successfully."}
+
+@app.post("/exams")
+async def create_exam_paper(request: ExamPaperRequest, current_user: User = Depends(get_current_user)):
+    """
+    Generates a balanced question paper for a final exam based on all topics
+    within a subject.
+    """
+    if current_user.role != "teacher":
+        raise HTTPException(status_code=403, detail="Permission denied.")
+
+    topic_ref = db.collection('topics').where('subject_id', '==', request.subject_id)
+    topics_docs = await topic_ref.get()
+    if not topics_docs:
+        raise HTTPException(status_code=404, detail="No topics found for this subject.")
+    
+    topic_names = [doc.to_dict().get('name') for doc in topics_docs]
+    
+    prompt = (
+        f"Create a balanced final exam paper with {request.num_questions} questions "
+        f"for a subject covering the following topics: {', '.join(topic_names)}. "
+        f"The difficulty should be {request.difficulty}. "
+        f"Include a mix of multiple-choice, short-answer, and true/false questions. "
+        f"For multiple choice, provide 4 options. Format the response as a JSON array of question objects."
+    )
+    
+    try:
+        response = llm.invoke(prompt)
+        exam_questions = json.loads(response)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate exam paper: {e}")
+
+    exam_paper = ExamPaper(
+        subject_id=request.subject_id,
+        questions=exam_questions,
+        teacher_id=current_user.uid,
+        created_at=datetime.utcnow()
+    )
+    
+    exam_ref = db.collection('exams').document()
+    await exam_ref.set(exam_paper.model_dump())
+    return exam_paper
+
+
+# ==============================================================================
+# 7. Student-specific Endpoints
+# ==============================================================================
+
+@app.get("/subjects")
+async def get_all_subjects():
+    """Returns a list of all available subjects."""
+    subjects_ref = db.collection('subjects')
+    subjects_docs = await subjects_ref.get()
+    subjects = [doc.to_dict() for doc in subjects_docs]
+    return subjects
+
+@app.get("/subjects/{subject_id}/details")
+async def get_subject_details(subject_id: str):
+    """Returns all modules and topics for a given subject."""
+    subject_doc = await db.collection('subjects').document(subject_id).get()
+    if not subject_doc.exists:
+        raise HTTPException(status_code=404, detail="Subject not found.")
+
+    modules_ref = db.collection('modules').where('subject_id', '==', subject_id)
+    modules_docs = await modules_ref.get()
+    modules = []
+    for module_doc in modules_docs:
+        module_data = module_doc.to_dict()
+        topics_ref = db.collection('topics').where('module_id', '==', module_doc.id)
+        topics_docs = await topics_ref.get()
+        module_data['topics'] = [topic_doc.to_dict() for topic_doc in topics_docs]
+        modules.append(module_data)
+
+    return {"subject": subject_doc.to_dict(), "modules": modules}
+
+
+@app.post("/quizzes")
+async def generate_quiz(request: QuizRequest, current_user: User = Depends(get_current_user)):
+    """
+    Generates a quiz for a student on a specific topic, using RAG.
+    """
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Permission denied. Only students can take quizzes.")
+    
+    topic_doc = await db.collection('topics').document(request.topic_id).get()
+    if not topic_doc.exists or not topic_doc.to_dict().get('pdf_path'):
+        raise HTTPException(status_code=404, detail="Topic or textbook not found.")
+
+    # Generate questions using RAG
+    questions_data = ask_llm_with_rag(
+        query=f"Generate {request.num_questions} multiple-choice questions about the content.",
+        topic_id=request.topic_id
+    )
+    
+    questions = [Question(**q) for q in questions_data]
+    
+    return QuizResponse(topic_id=request.topic_id, questions=questions)
+
+@app.post("/submit-quiz-answer")
+async def submit_quiz_answer(answer: QuizAnswer):
+    """
+    Submits a quiz answer and updates the student's confidence score for a topic.
+    """
+    # This logic implements the confidence score update mentioned in the PDF
+    
+    progress_ref = db.collection('student_progress').document(f"{answer.student_id}_{answer.topic_id}")
+    progress_doc = await progress_ref.get()
+
+    if progress_doc.exists:
+        data = progress_doc.to_dict()
+        correct_count = data.get('correct_answers', 0)
+        total_count = data.get('total_answers', 0)
+    else:
+        correct_count = 0
+        total_count = 0
+
+    total_count += 1
+    if answer.is_correct:
+        correct_count += 1
+
+    new_confidence = correct_count / total_count
+    
+    await progress_ref.set({
+        "student_id": answer.student_id,
+        "topic_id": answer.topic_id,
+        "correct_answers": correct_count,
+        "total_answers": total_count,
+        "confidence_score": new_confidence
+    })
+
+    return {"message": "Progress updated", "new_confidence": new_confidence}
+
+# New Endpoints for Assignments
+
+@app.post("/assignments")
+async def generate_assignment(topic_id: str, current_user: User = Depends(get_current_user)):
+    """
+    Generates a personalized assignment for a student based on their confidence score.
+    """
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Permission denied. Only students can request assignments.")
+
+    # Get student's confidence score for the topic
+    progress_ref = db.collection('student_progress').document(f"{current_user.uid}_{topic_id}")
+    progress_doc = await progress_ref.get()
+    confidence_score = progress_doc.to_dict().get('confidence_score', 0.5) if progress_doc.exists else 0.5
+
+    # Determine prompt based on confidence score
+    if confidence_score < 0.5:
+        prompt_query = "Generate 3-5 short-answer questions to help a student with low confidence improve their understanding of key concepts."
+    elif confidence_score < 0.8:
+        prompt_query = "Generate 2-3 comprehensive short-answer questions to challenge a student with moderate confidence."
+    else:
+        prompt_query = "Generate a single, in-depth essay question for a student with high confidence to demonstrate mastery of the topic."
+
+    # Generate assignment questions using RAG and LLM
+    questions_data = ask_llm_with_rag(prompt_query, topic_id, is_assignment=True)
+
+    # Save the assignment to Firestore
+    assignment_ref = db.collection('assignments').document()
+    assignment_data = {
+        "id": assignment_ref.id,
+        "topic_id": topic_id,
+        "student_id": current_user.uid,
+        "questions": questions_data,
+        "created_at": datetime.utcnow()
+    }
+    await assignment_ref.set(assignment_data)
+    
+    return Assignment(**assignment_data)
+
+@app.post("/assignments/{assignment_id}/submit")
+async def submit_assignment_answer(assignment_id: str, submission: AssignmentSubmission, current_user: User = Depends(get_current_user)):
+    """
+    Submits a student's answer and receives AI-powered feedback.
+    """
+    if current_user.role != "student":
+        raise HTTPException(status_code=403, detail="Permission denied.")
+
+    assignment_doc = await db.collection('assignments').document(assignment_id).get()
+    if not assignment_doc.exists or assignment_doc.to_dict().get('student_id') != current_user.uid:
+        raise HTTPException(status_code=404, detail="Assignment not found or unauthorized access.")
+    
+    assignment_data = assignment_doc.to_dict()
+    
+    # Find the specific question and get its context
+    question_to_answer = next((q for q in assignment_data['questions'] if q['id'] == submission.question_id), None)
+    if not question_to_answer:
+        raise HTTPException(status_code=404, detail="Question not found in this assignment.")
+
+    # Retrieve context for RAG-based feedback
+    topic_doc = await db.collection('topics').document(assignment_data['topic_id']).get()
+    if not topic_doc.exists or not topic_doc.to_dict().get('pdf_path'):
+        raise HTTPException(status_code=404, detail="Topic or textbook not found for feedback generation.")
+    
+    db_instance = get_chroma_db_for_topic(assignment_data['topic_id'])
+    retriever = db_instance.as_retriever()
+    docs = retriever.get_relevant_documents(question_to_answer['question'])
+    context = "\n\n".join([doc.page_content for doc in docs])
+
+    # Generate AI feedback
+    ai_feedback = ask_llm_for_feedback(submission.student_answer, context, question_to_answer['answer'])
+    
+    # Update the question with the student's answer and AI feedback
+    for q in assignment_data['questions']:
+        if q['id'] == submission.question_id:
+            q['student_answer'] = submission.student_answer
+            q['ai_feedback'] = ai_feedback
+            break
+
+    await db.collection('assignments').document(assignment_id).set(assignment_data)
+
+    return {"message": "Assignment answer submitted and feedback generated.", "feedback": ai_feedback}
+
+
+@app.get("/students/{student_id}/progress")
+async def get_student_progress(student_id: str):
+    """Returns the student's progress and confidence scores for all topics."""
+    progress_ref = db.collection('student_progress').where('student_id', '==', student_id)
+    progress_docs = await progress_ref.get()
+
+    progress = [doc.to_dict() for doc in progress_docs]
+    return progress
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

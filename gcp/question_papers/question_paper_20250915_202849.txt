@@ -1,0 +1,41 @@
+================================================================================
+                           DEEP LEARNING EXAMINATION                            
+Date: 2025-09-15
+================================================================================
+
+
+**Module-1: Introduction to Neural Network Fundamentals**
+
+    1. a. Define "Neural Network" and describe its basic structure (20 Marks).  
+       b. Explain the relation between Perceptron models and Bayes Classifier in Gaussian environments, including an example where this relationship is useful (8 Marks) or Describe how activation functions modify outputs of neurons within a network layer to capture non-linear relationships among inputs; give examples from different types of networks such as feedforward neural networks, convolutional neural networks, and recurrent neural networks. Ensure that the marking distribution adds up correctly for each sub-question based on your judgment (12 Marks).
+    
+    OR  
+
+        // Example with three questions in a more complex scenario 
+        3. a. Explain why Perceptron models can only learn linearly separable functions and provide an example where this limitation is evident; discuss the limitations of using such simple structures for real-world problems (6 Marks)   
+          b. Discuss how Gaussian distribution in Bayesian Classifier influences its performance, providing a scenario when it works better than Perceptron classifiers with nonlinear decision boundaries (4 Marks) and c. Describe scenarios where these models are effectively applied together to solve complex problems such as handwritten digit recognition or image classification tasks; include the role of softmax function in multi-class classification settings using perceptrons within a neural network architecture for this task (10 Marks).
+        OR  
+    
+    **Module-2: Neural Network Models and Human Brain Inspiration**
+
+        4. a. Describe the basic model of a neuron, highlighting its ability to process information through electrical impulses; relate it with artificial neural networks by comparing their functional units (neurons) but differ in material properties between biological brains and digital computers that execute algorithms such as perceptron models or backpropagation learning techniques. Provide examples of how these differences affect the network's design choices for efficiency purposes, including energy consumption and error rates when dealing with noisy data inputs (15 Marks).  
+           b. Explain what Directed Graph View of Neural Networks is; create a hypothetical neural network architecture using this perspective that demonstrates resilience to common issues in deep learning such as vanishing gradients or exploding gradients, and justify your design choices based on the properties shown by directed graphs (15 Marks).
+        OR  
+    
+    **Module-3: Network Architectures**
+
+        6. a. Explain Rosenblatt's Perceptron theory; describe how it operates as an input layer to process data and interact with subsequent layers within multilayer perceptrons (12 Marks). Discuss the limitations of this model in handling non-linearly separable functions directly, including visual examples or plots illustrating these concepts.
+           b. Delve into Perceptron Convergence Theorem; present a theoretical proof for its convergence with weight initialization and learning rate parameters that ensure global minimum reachability within convex error surfaces (10 Marks). 
+        OR  
+    
+    **Module-4: Deep Learning Algorithms**
+
+        7. a. Explain the concept of Backpropagation Algorithm in training Neural Network, describing its role and importance for adjusting weights based on errors calculated at output layer backward to input layers (15 Marks). Discuss how this algorithm helps mitigate issues such as local minima or vanishing gradients when dealing with complex functions that require nonlinear processing capabilities.
+           b. Describe heuristics and methods used in improving Backpropagation's performance, particularly focusing on techniques like dropout regularization to prevent overfitting; relate these concepts by explaining how they contribute towards network generalizability (15 Marks). 
+        OR  
+    
+    **Module-5: Practical Applications and Future of Deep Learning**
+
+        8. a. Discuss the importance and impact of Dataset Augmentation techniques on improving training accuracy in deep learning models; provide examples where augmented datasets have led to improved performance, especially with limited real data (10 Marks). Elaborate how dataset diversity within these methods can affect model robustness against adversarial inputs or noisy environments.
+           b. Describe Semi-Supervised Learning approaches and their significance in the context of Deep Neural Networks; explain using practical scenarios where labels are scarce, such as anomaly detection tasks on large datasets like those found within IoT sensor networks (10 Marks). Discuss how semi-supervised learning can exploit both labeled and unlabeled data to improve performance over fully supervised or weakly supervised approaches.
+        OR  

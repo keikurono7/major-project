@@ -1,0 +1,42 @@
+================================================================================
+                           DEEP LEARNING EXAMINATION                            
+Date: 2025-09-15
+================================================================================
+
+
+Module-1: Foundations of Machine Learning (30 Marks)
+======================
+The following questions are based on the definitions, concepts and applications related to machine learning. Each question consists of two sub-questions that students can answer for partial credit in case one is attempted before another or if an unforeseen obstacle arises during any part of a longer problem set:
+**Note: Sub-Questions within each main Question sum up to 20 Marks.**
+
+1a. Define Machine Learning (ML) as used within the context of Artificies Intelligence and provide examples where it has been applied successfully in real-world problems with at least two different sectors, such as healthcare or finance (15 marks). Explain how machine learning algorithms differentiate from traditional algorithmic approaches to problem solving.
+   b. Identify three core components of a typical ML system and describe their roles within the overall architecture. Discuss one recent advancement in each component that enhances performance, particularly with regard to efficiency or accuracy (15 marks). 
+    - Sub-question for Machine Learning Definition: (7 Marks) – Definitions; Examples from Healthcare/Finance Sectors and Traditional Algorithms Comparison. (8 Marks) – ML System Core components & Advancements description with performance enhancement details in Efficiency or Accuracy aspects.
+    
+2a. Explain the concept of Supervised Learning, focusing particularly on its application within Support Vector Machines for classification problems and K-Means Clustering algorithms used primarily for unsupervised learning tasks (10 Marks). Provide a real world scenario where each algorithm could be beneficially applied with justification.
+   b. Discuss the limitations or challenges faced when applying SVM in large datasets, providing two possible solutions to mitigate these issues without compromising on accuracy too much and discuss their advantages over conventional methods (10 Marks). Provide a scenario where this approach would be preferred despite its complexity due to data nature or task uniqueness.
+    - Sub-question for Supervised Learning: SVM Application in Classification problems with real world scenarios justification, K-Means Clustering application and explanation of the unsupervised learning context (5 Marks) – Real World Scenarios & Applications Explanation; Challenges/Limitations discussion along with proposed solutions without compromising accuracy significantly.
+    
+Module 2: Deep Learning Approaches in Neural Network Architecture (30 Marks)
+======================
+The following questions are based on understanding, designing and application of neural networks focusing particularly on backpropagation algorithms including variants like Adaptive Methods such as Adam within deep learning. Students must demonstrate a clear comprehension of the concepts through explanations or designs where required:
+**Note: Sub-Questions sum up to 20 Marks in each question, but no more than three sub-questions are provided for complexity management. The questions have an equal weighting between foundational knowledge and analytical skills/design proposals as per the syllabus guidelines outlined above**
+    
+3a. Describe backpropagation algorithm along with its working principle, including a detailed explanation of how errors are propagated through neural network layers to optimize weights (10 Marks). Design an imaginary scenario wherein applying this technique could result in significantly better performance compared against using the gradient descent approach alone and justify your reasoning.
+   b. Explain Adaptive Learning Rate techniques such as Adam, their advantages over traditional Gradient Descent when applied to Neural Network training for deep learning tasks (10 Marks). Justify why these methods can be more beneficial in terms of convergence speed or stability across varying network architectures and dataset characteristics without using complex mathematical proofs.
+    - Sub-Question 3a: Detailed Explanation on Backpropagation & Error Propagation Principles, Imaginative Scenario for Better Performance Comparison (5 Marks) – Understanding of Working principle; Analytical Justification for backpropagation advantages in a specific scenario.
+    
+4a. Discuss the role and mechanism behind Recurrent Neural Networks with emphasis on their architecture differences from Feed-forward networks, specifically LSTM (Long Short Term Memory) cells which deal effectively with sequential data problems such as Natural Language Processing or time series prediction tasks like stock prices analysis (10 Marks).
+   b. Given a dataset that contains sequences of text and the task is to predict next word in sequence for auto-completing user input, propose an RNN architecture suited for this problem explaining why LSTM cells would be particularly beneficial over others considering their memory capabilities (10 Marks). Do not include any implementation code but focus on architectural decisions.
+    - Sub-Question 4a: Role and Mechanism Explanation of Recurrent & RNN Architecture Differences from Feed-forward networks, LSTM Cells for Sequential Data (5 Marks) – Understanding architecture differences; Reasoning behind the choice of using an RNN over a traditional feed-forward network.
+    
+Module 3: Debugging and Performance Optimization in Deep Learning Systems (20 Marks)
+======================
+The following questions are based on debugging strategies, performance evaluation metrics used specifically within deep learning context along with optimizing neural networks for better results without directly asking students to write code. Questions will require analytical skills focusing mainly but not limitedly towards improving the efficiency of existing systems and understanding potential bottlenecks:
+**Note: Sub-Questions sum up 20 Marks in each question, no more than three sub-questions are provided for cognitive level management as per syllabus guidelines. The questions have an equal weighting between foundational knowledge on performance metrics and analytical skills/proposals with respect to debugging strategies or optimizations**
+    
+5a. Identify common issues that could potentially lead to sub-optimal performances in deep learning models along with their root causes (10 Marks). Explain three general approaches for effective model diagnostics during the training and validation process, emphasizing on early detection of these problems without using code snippets or complex mathematical derivations.
+   b. Suggest at least two optimization techniques that can be applied to improve computational efficiency in neural network systems while discussing their implications (10 Marks). Include an example scenario where each technique is more favorable, considering factors like hardware constraints and model complexity without asking students for code snippets or implementations but focusing on theoretical aspects.
+    - Sub-Question 5a: Common Issues Identification & Root Causes Explanation; Model Diagnostics Approaches with Early Detection (5 Marks) – Understanding of performance issues, Effective diagnosis strategies for early detection in training and validation processes without using code snippets or complex math.
+    
+This examination paper will assess students’ understanding across a wide range of topics within deep learning theory as well as their analytical skills applied to real-world scenarios involving machine learning systems while keeping the complexity level moderate but challenging, encouraging comprehensive responses rather than quick recall answers and avoid asking repetitive conceptual information.

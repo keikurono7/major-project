@@ -1,0 +1,38 @@
+================================================================================
+                           DEEP LEARNING EXAMINATION                            
+Date: 2025-09-15
+================================================================================
+
+M.Tech Deep Learning Examination - Module-Wise Breakdown and Questions:
+
+**Module I – Fundamentals of Machine Learning and Supervised Algorithms**  
+*10 marks per sub-question, total = 20 Marks*   
+Q1 (Topic: KNN Algorithm) OR Q2 (Topic: Classification Procedure Advantages/Disadvantages):    
+a. Explain the working principle of k-nearest neighbors algorithm in classification tasks with a detailed example and evaluation metric used to assess its performance? [10 Marks]  
+b. Describe two primary advantages and disadv0minations associated with using KNN for large datasets, providing examples where applicable? [10 Marks]   
+
+**Module II – Principles of Deep Learning & Neural Network Basics**  
+*10 marks per sub-question, total = 20 Marks*   
+Q3 (Topic: Why deep learning?) OR Q4 (Topic: Differences between Recurrent and Feedforward Neural Network):    
+a. Elaborate on the core motivations behind employing Deep Learning methodologies in complex problem-solving, with emphasis on at least one specific application scenario? [10 Marks]  
+b. Contrast RNN (Recurrent) neural networks and Feedforward neural networks by detailing their structural differences, strengths and limitations as applied to sequential data processing tasks such as language translation or time-series forecasting? [10 Marks]   
+
+**Module III – Deep Learning Architectures & LSTM Cells in Neural Networks**  
+*10 marks per sub-question, total = 20 Marks*    
+Q5 (Topic: Conceptual Understanding of Backpropagation) OR Q6 (Topic: Memory cells equations for Long Short-Term Memory):   
+a. Provide a comprehensive explanation of the backpropagation algorithm and its significance in training neural networks, with reference to gradient descent? [10 Marks]  
+b. Formulate the key LSTM memory cell equations utilized within RNN frameworks; illustrate their functioning through an example involving sequence prediction tasks such as text generation or speech recognition scenarios? [10 Marks]   
+
+**Module IV – Debugging & Deployment of Machine Learning Systems**    
+*10 marks per sub-question, total = 20 Marks*  
+Q7 (Topic: Effective debugging strategies in ML systems) OR Q8 (Topic: Real-life application problems and how to troubleshoot them):   
+a. Discuss at least three systematic approaches for identifying and rectifying common issues encountered during the training phase of deep learning models, with reference from peer-reviewed research? [10 Marks]  
+b. Present a practical case study where you encounter an anomaly or error in deployment scenarios (e.g., misclassification problem), describing step by step how to troubleshoot and rectify the issue using available debugging techniques, including performance analysis post-correction? [10 Marks]   
+
+**Module V – Introduction to Natural Language Processing & Speech Recognition Systems**    
+*10 marks per sub-question, total = 20 Marks*  
+Q9 (Topic: Definitions and terminologies used in NLP processes) OR Q10 (Topic of speech recognition types):   
+a. Define essential terminologies associated with Natural Language Processing such as tokenization, parsing, syntax trees, entity recognition etc., providing illustrative examples from contemporary research or industry use cases? [10 Marks]  
+b. Describe different systems used for Speech Recognition and the role of performance metrics in evaluating their classification capabilities; provide an example scenario to demonstrate how these measurements are critical when comparing multiple speech-to-text solutions? [10 Marks]   
+
+Total Examination Marks = 20 * (Module count) - 35 bonus marks for exceptional comprehension and clarity in answers.

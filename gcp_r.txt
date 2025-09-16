@@ -1,0 +1,12 @@
+fastapi
+uvicorn
+langchain-community
+langchain-chroma
+langchain-ollama
+pydantic
+requests
+python-multipart
+firebase-admin
+pypdf
+scikit-learn
+nltk

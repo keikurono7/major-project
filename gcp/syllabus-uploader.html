@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Syllabus and Textbook Uploader</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 2rem; background-color: #f8f9fa; color: #333; }
+    h1, h2, h3, h4 { color: #212529; }
+    label { display: block; margin-top: 1rem; font-weight: 500; }
+    input, button { margin-top: 0.5rem; width: 100%; max-width: 450px; padding: 0.75rem; border-radius: 6px; border: 1px solid #ced4da; font-size: 1rem; box-sizing: border-box; }
+    button { background-color: #007bff; color: white; border: none; cursor: pointer; font-weight: bold; }
+    button:hover { background-color: #0056b3; }
+    button:disabled { background-color: #6c757d; cursor: not-allowed; }
+    .result { background: #fff; border: 1px solid #dee2e6; padding: 1.5rem; margin-top: 1rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .section { border-bottom: 1px solid #eee; margin-bottom: 2rem; padding-bottom: 2rem; }
+    .status { margin-top: 1rem; font-size: 1rem; color: #0056b3; font-weight: 500; }
+    .file-list-item { background: #e9ecef; margin: 0.2rem 0; padding: 0.4rem 0.6rem; border-radius: 4px; font-size: 0.9rem; }
+    .result h3 { border-bottom: 2px solid #007bff; padding-bottom: 0.5rem; margin-top: 0; }
+    .result h4 { margin-top: 1.5rem; margin-bottom: 0.5rem; color: #495057; }
+    .result ul { list-style-type: '✓ '; padding-left: 20px; margin: 0; }
+    .result li { padding: 0.2rem 0; }
+    .stats { font-size: 0.9rem; color: #6c757d; margin: 1rem 0; background-color: #f8f9fa; padding: 0.5rem; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>Syllabus and Textbook Uploader</h1>
+  <p>Combine textbooks and structure them with a syllabus, just like NotebookLM.</p>
+
+  <div class="section">
+    <h2>Upload Files</h2>
+    <form id="upload-form">
+      <label for="teacher-id">Teacher ID:</label>
+      <input type="text" id="teacher-id" required value="test-teacher-123">
+      <label for="syllabus-file">Syllabus PDF:</label>
+      <input type="file" id="syllabus-file" accept="application/pdf" required>
+      <label for="textbook-files">Textbook PDFs (select one or more):</label>
+      <input type="file" id="textbook-files" accept="application/pdf" multiple required>
+      <div id="selected-textbooks"></div>
+      <button type="submit" id="submit-button">Upload and Process</button>
+    </form>
+    <div class="status" id="status-message"></div>
+    <div id="upload-result" class="result" style="display: none;"></div>
+  </div>
+
+<script>
+    const API_BASE = "http://34.47.166.40:8000";
+
+    function displayStructure(resultData) {
+        const resultDiv = document.getElementById('upload-result');
+        resultDiv.innerHTML = '';
+        resultDiv.style.display = 'block';
+
+        const structure = resultData.structure;
+        if (!structure || !structure.modules) {
+            resultDiv.innerHTML = `<p>Error: Could not display structure.</p><pre>${JSON.stringify(resultData, null, 2)}</pre>`;
+            return;
+        }
+
+        resultDiv.innerHTML = `<h3>✅ Processed Syllabus: ${structure.subject_name}</h3>`;
+        resultDiv.innerHTML += `
+            <p class="stats">
+                <b>Modules Created:</b> ${resultData.modules_created_count} | 
+                <b>Topics Created:</b> ${resultData.topics_created_count} | 
+                <b>Topics with Mapped Content:</b> ${resultData.topics_with_content_count}
+            </p>
+        `;
+
+        structure.modules.forEach(module => {
+            const moduleTitle = document.createElement('h4');
+            moduleTitle.textContent = module.name;
+            resultDiv.appendChild(moduleTitle);
+
+            const topicList = document.createElement('ul');
+            if (module.topics && module.topics.length > 0) {
+                module.topics.forEach(topic => {
+                    const topicItem = document.createElement('li');
+                    topicItem.textContent = topic.name;
+                    topicList.appendChild(topicItem);
+                });
+            } else {
+                topicList.innerHTML = `<li style="color: #888; list-style-type: 'x ';">No topics found for this module.</li>`;
+            }
+            resultDiv.appendChild(topicList);
+        });
+    }
+
+    document.getElementById('textbook-files').addEventListener('change', function() {
+        const fileListDiv = document.getElementById('selected-textbooks');
+        fileListDiv.innerHTML = '';
+        if (this.files.length > 0) {
+            Array.from(this.files).forEach(file => {
+                const item = document.createElement('div');
+                item.className = 'file-list-item';
+                item.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
+                fileListDiv.appendChild(item);
+            });
+        }
+    });
+
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitButton = document.getElementById('submit-button');
+        const statusMessage = document.getElementById('status-message');
+        const resultDiv = document.getElementById('upload-result');
+        
+        const teacherId = document.getElementById('teacher-id').value;
+        const syllabusFile = document.getElementById('syllabus-file').files[0];
+        const textbookFiles = document.getElementById('textbook-files').files;
+
+        if (!syllabusFile || textbookFiles.length === 0) {
+            statusMessage.textContent = 'Please select both a syllabus and at least one textbook file.';
+            statusMessage.style.color = 'red';
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('syllabus_file', syllabusFile);
+        Array.from(textbookFiles).forEach(file => formData.append('textbook_files', file));
+        formData.append('request', JSON.stringify({ teacher_id: teacherId }));
+
+        submitButton.disabled = true;
+        submitButton.textContent = 'Processing...';
+        statusMessage.textContent = 'Uploading and processing files. This may take a moment...';
+        statusMessage.style.color = '#0056b3';
+        resultDiv.style.display = 'none';
+
+        try {
+            const response = await fetch(`${API_BASE}/syllabus-textbook-upload`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`Server error: ${response.status} - ${errorData.detail || 'Unknown error'}`);
+            }
+
+            const data = await response.json();
+            displayStructure(data);
+            statusMessage.textContent = 'Processing complete!';
+            statusMessage.style.color = '#28a745';
+
+        } catch (err) {
+            statusMessage.textContent = `Error: ${err.message}`;
+            statusMessage.style.color = 'red';
+            resultDiv.innerHTML = `<pre style="color: red;">${err.message}</pre>`;
+            resultDiv.style.display = 'block';
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Upload and Process';
+        }
+    });
+</script>
+</body>
+</html>

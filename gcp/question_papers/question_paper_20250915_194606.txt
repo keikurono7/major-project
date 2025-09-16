@@ -1,0 +1,25 @@
+================================================================================
+                           DEEP LEARNING EXAMINATION                            
+Date: 2025-09-15
+================================================================================
+
+```plaintext02_M_Tech.Degree._Examination_.pdf
+Title: M.Tech. Degree Examination in Deep Learning - II Semester, Feb./Mar., Year
+Instructions to Candidates: Answer any FIVE full questions (Choose one from each Module), choosing ONE question per module based on your understanding of the syllabus topics provided above and ensuring no repetition. Submit along with this Examination Paper only two printed copies for evaluation by 10 AM, Two Hours after exam commencement time (Note: In case you run out of answer sheets before filling all five questions please submit whatever numbered copy(s) are available).
+Exam Duration: Three hours. Maximum Ksheets allowed per student : Ten Question Papers with Sub-questions to be answered and submitted inside the Paper itself for immediate evaluation by invigilators in presence of supervisor/professor, following which marked copies would immediately be handed out back to you.
+Notes on Examination: (a) The paper should follow an "OR" question format where each main Q1 is followed by another option i.e., OR(Q2). 
+Each Main Question must have two sub-questions, labeled 'a' and 'b', both carrying equal marks of ten out of the total hundred available in this Examination Paper. Henceforth:
+      Module-I                                (10 Marks each) [Total = 20]  
+     a) Explain Machine Learning...             b) What are various types ...         c) Describe supervised learning approach using Sample Ple...          d) Discuss the significance of Deep Learning motivation.        Total:     20 marks      
+    Module-II                              (10 Marks each) [Total = 20]  
+     a) Explain working mechanism ...            b) What is Regularization and how does it help in...          c) Describe briefly about Gradient Descent algorithms.         d) Discuss Adaptive Learning rate evolutional Neural Network models, specifically its variants of RNNs processing data sequences along with memory cell principles (LSTM).        Total:     20 marks      
+    Module-III                              (10 Marks each) [Total = 30]  
+     a) Explain briefly about debugging strategies when ML system underperforms.          b) Outline some common steps involved in Natural Language Processing...         c) Discuss different types of Speech Recognition systems along with their working principles and applications, addressing the main challenges associated for each type; include subtasks like acoustic models training/inference generation (for a typical HMM-based system).        Total:     30 marks      
+    Module-IV                              (10 Marks each) [Total = 25]  
+     a) What are challenges in Aligning Neural Network with existing applications?          b) Explain briefly about the components of Decision Trees, and how can it be applied to solve classification problems along with its advantages/disadvantages.        Total:     25 marks      
+    Module-V                               (10 Marks each) [Total = 35]  
+     a) Explain briefly about Kernel Method in the context of SVM and how it relates to Deep Learning techniques for handling nonlinear data mappings; discuss with references from recent literature.          b) Discuss various performance metrics commonly used when solving classification problems, including but not limited to Confusion Matrix (CM), Precision-Recall Curve (PRC), Receiver Operating Characteristic curve (ROC), Area Under the ROC curve (AUC). Also discuss how these measures can be misleading in certain circumstances and why such conditions exist.        Total:     35 marks      
+    Grand Totals for each Sub-question across all modules - 10 Marks each, hence giving a grand total of [20+20+30+25+35 =] **130** (maximum) and the actual allocated score in this Examination will range from [Min. to Max.] :   
+     Minimum Allocated Score: 86  
+     Maximum Allocated Score: [94 + as per extra credits if any, considering additional complexity or unique approaches].       Total Marks Available for the Paper - **100** (Max) plus Extra Credit Points.    Note to Candidates/Students: This Examination paper is based on topics from provided syllabus and hence might not cover all recent developments in DL, but it aims at testing your grasp of fundamental concepts relevant for MTech degree programmes till date [and beyond]. Keep calm, be focused. Best Wishes!
+```
