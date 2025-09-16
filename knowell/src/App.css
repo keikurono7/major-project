@@ -1,10 +1,6 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
-}
+/* Remove the problematic #root styles that were constraining your layout */
 
+/* Keep only the logo animations if you need them elsewhere */
 .logo {
   height: 6em;
   padding: 1.5em;
@@ -33,6 +29,7 @@
   }
 }
 
+/* Keep utility classes but make them less specific */
 .card {
   padding: 2em;
 }
@@ -40,3 +37,17 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Add some basic responsive utilities */
+@media (max-width: 768px) {
+  .mobile-hidden {
+    display: none;
+  }
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  transition: filter 300ms;
+}
+

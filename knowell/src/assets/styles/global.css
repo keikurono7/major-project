@@ -1,17 +1,25 @@
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');
 
 :root {
-  --primary: #2563eb;
-  --primary-dark: #1d4ed8;
-  --secondary: #64748b;
-  --success: #22c55e;
-  --danger: #ef4444;
-  --warning: #f59e0b;
-  --light: #f1f5f9;
-  --dark: #0f172a;
-  --gray: #94a3b8;
+  /* Primary Colors */
+  --primary: #ca404f;
+  --primary-dark: #7c1d21;
+  --secondary: #e89fba;
+  --accent: #d8ebf2;
+  
+  /* Status Colors */
+  --success: #7c1d23;
+  --danger: #cc3f4f;
+  --warning: #e59fb9;
+  
+  /* Base Colors */
+  --light: #d2ecf2;
+  --dark: #7c1d21;
+  --gray: #e6a0ba;
   --white: #ffffff;
-  --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  
+  /* Shadows with new color scheme */
+  --shadow: 0 4px 6px -1px rgba(124, 29, 33, 0.1), 0 2px 4px -1px rgba(124, 29, 33, 0.06);
 }
 
 * {
@@ -147,14 +155,13 @@ p { margin-bottom: 1rem; }
 }
 
 .sidebar-item:hover {
-  background-color: rgba(37, 99, 235, 0.1);
+  background-color: rgba(202, 64, 79, 0.1);
   color: var(--primary);
 }
 
 .sidebar-item.active {
-  background-color: rgba(37, 99, 235, 0.1);
+  background-color: rgba(202, 64, 79, 0.1);
   color: var(--primary);
-  font-weight: 500;
 }
 
 .main-content {
@@ -202,7 +209,7 @@ p { margin-bottom: 1rem; }
 }
 
 .stat-card:hover {
-  transform: translateY(-5px);
+  box-shadow: 0 10px 15px -3px rgba(124, 29, 33, 0.1);
 }
 
 .stat-title {
@@ -316,3 +323,15 @@ p { margin-bottom: 1rem; }
 .gap-2 { gap: 0.5rem; }
 .gap-4 { gap: 1rem; }
 .w-full { width: 100%; }
+.text-primary { color: var(--primary); }
+.text-secondary { color: var(--secondary); }
+.text-accent { color: var(--accent); }
+
+/* Links */
+a {
+  color: var(--primary);
+}
+
+a:hover {
+  color: var(--primary-dark);
+}

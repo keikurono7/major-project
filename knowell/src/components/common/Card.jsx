@@ -8,17 +8,17 @@ const Card = ({
   className = '' 
 }) => {
   return (
-    <div className={`sharp-card bg-white border border-gray-300 ${className}`}>
+    <div
+      className={`bg-white rounded-xl shadow-sm border border-gray-100 ${
+        padding ? 'p-6' : ''
+      } ${className}`}
+    >
       {title && (
-        <div className="border-b border-gray-300 p-3">
-          <h3 className="font-medium text-lg">{title}</h3>
-        </div>
+        <h2 className="text-lg font-semibold text-gray-900 mb-4">{title}</h2>
       )}
-      
-      <div className={padding ? 'p-4' : ''}>
-        {children}
-      </div>
-      
+
+      {children}
+
       {footer && (
         <div className="border-t border-gray-300 p-3">
           {footer}
