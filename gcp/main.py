@@ -568,6 +568,65 @@ async def upload_syllabus(
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error processing syllabus: {str(e)}")
     
+@app.post("/generate-multi-topic-assignment-bkt")
+async def generate_multi_topic_assignment_bkt(
+    request: dict = Body(...),
+    user_id: str = Header(None)
+):
+    """
+    Generate an assignment for multiple topics, passing BKT params for each topic.
+    """
+    subject_id = request.get("subject_id")
+    module_id = request.get("module_id")
+    topic_ids = request.get("topic_ids", [])
+    num_questions_per_topic = request.get("num_questions_per_topic", 3)
+    bkt_params = request.get("bkt_params", {})
+
+    if not subject_id or not topic_ids:
+        raise HTTPException(status_code=400, detail="Subject and topics are required.")
+
+    # Get subject/module/topic names for context
+    subject_data = get_subject_structure(subject_id)
+    module_name = None
+    for mod in subject_data["modules"]:
+        if mod["id"] == module_id:
+            module_name = mod["name"]
+            break
+
+    # Gather topic names and BKT params
+    topics_info = []
+    for mod in subject_data["modules"]:
+        for topic in mod["topics"]:
+            if topic["id"] in topic_ids:
+                topics_info.append({
+                    "id": topic["id"],
+                    "name": topic["name"],
+                    "module_name": mod["name"],
+                    "bkt": bkt_params.get(topic["id"], {})
+                })
+
+    # Generate assignment using the topics and their BKT params
+    questions = []
+    for topic in topics_info:
+        # Pass BKT params to your assignment generator
+        assignment = generate_topic_assignment(
+            subject_name=subject_data["name"],
+            module_name=topic["module_name"],
+            topic_name=topic["name"],
+            num_questions=num_questions_per_topic,
+            student_id=user_id,
+            bkt_params=topic["bkt"]  # You may need to update your assignment generator to accept this
+        )
+        questions.extend(assignment.get("questions", []))
+
+    return {
+        "subject": subject_data["name"],
+        "module": module_name,
+        "topics": [t["name"] for t in topics_info],
+        "questions": questions
+    }
+
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

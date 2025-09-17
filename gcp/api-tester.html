@@ -661,30 +661,30 @@
         <!-- Assignment Tab -->
         <div class="tab-content" id="assignment">
             <div class="endpoint-section">
-                <h2 class="endpoint-title">Generate Topic Assignment</h2>
-                <div class="input-group">
-                    <label for="assignment-subject">Subject Name:</label>
-                    <input type="text" id="assignment-subject" value="Computer Science">
-                </div>
-                <div class="input-group">
-                    <label for="assignment-module">Module Name:</label>
-                    <input type="text" id="assignment-module" value="Programming Fundamentals">
-                </div>
-                <div class="input-group">
-                    <label for="assignment-topic">Topic Name:</label>
-                    <input type="text" id="assignment-topic" value="Variables and Data Types">
-                </div>
-                <div class="input-group">
-                    <label for="assignment-questions">Number of Questions:</label>
-                    <input type="number" id="assignment-questions" min="1" max="5" value="3">
-                </div>
-                <button onclick="generateTopicAssignment()">Generate Assignment</button>
-                <div id="assignment-spinner" class="loading hidden"></div>
-                <div id="assignment-response" class="response hidden">
-                    <div class="status" id="assignment-status"></div>
-                    <pre id="assignment-result"></pre>
-                </div>
+            <h2 class="endpoint-title">Generate Assignment (Multi-Topic, BKT-Aware)</h2>
+            <div class="input-group">
+                <label for="assign-subject">Subject:</label>
+                <select id="assign-subject" onchange="loadAssignModules()"></select>
             </div>
+            <div class="input-group">
+                <label for="assign-module">Module:</label>
+                <select id="assign-module" onchange="loadAssignTopics()"></select>
+            </div>
+            <div class="input-group">
+                <label for="assign-topics">Topics (select multiple):</label>
+                <select id="assign-topics" multiple size="6"></select>
+            </div>
+            <div class="input-group">
+                <label for="assign-num-questions">Questions per Topic:</label>
+                <input type="number" id="assign-num-questions" min="1" max="10" value="3">
+            </div>
+            <button onclick="generateMultiTopicAssignment()">Generate Assignment</button>
+            <div id="assign-spinner" class="loading hidden"></div>
+            <div id="assign-response" class="response hidden">
+                <div class="status" id="assign-status"></div>
+                <pre id="assign-result"></pre>
+            </div>
+        </div>
             
             <div class="endpoint-section">
                 <h2 class="endpoint-title">Generate Multi-Topic Assignment</h2>
@@ -1287,6 +1287,100 @@
           } else {
             document.getElementById('finish-quiz-btn').style.display = 'block';
           }
+        }
+
+        // Load subjects on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            loadAssignSubjects();
+        });
+
+        async function loadAssignSubjects() {
+            const select = document.getElementById('assign-subject');
+            select.innerHTML = '';
+            const res = await fetch(`${API_URL}/subjects`, { headers: { 'user-id': currentUser.id } });
+            const data = await res.json();
+            for (const subj of data.subjects) {
+                const opt = document.createElement('option');
+                opt.value = subj.id;
+                opt.textContent = subj.name;
+                select.appendChild(opt);
+            }
+            loadAssignModules();
+        }
+
+        async function loadAssignModules() {
+            const subjectId = document.getElementById('assign-subject').value;
+            const select = document.getElementById('assign-module');
+            select.innerHTML = '';
+            const res = await fetch(`${API_URL}/subjects/${subjectId}/modules`, { headers: { 'user-id': currentUser.id } });
+            const data = await res.json();
+            for (const mod of data.modules) {
+                const opt = document.createElement('option');
+                opt.value = mod.id;
+                opt.textContent = mod.name;
+                select.appendChild(opt);
+            }
+            loadAssignTopics();
+        }
+
+        async function loadAssignTopics() {
+            const moduleId = document.getElementById('assign-module').value;
+            const select = document.getElementById('assign-topics');
+            select.innerHTML = '';
+            const res = await fetch(`${API_URL}/modules/${moduleId}/topics`, { headers: { 'user-id': currentUser.id } });
+            const data = await res.json();
+            for (const topic of data.topics) {
+                const opt = document.createElement('option');
+                opt.value = topic.id;
+                opt.textContent = topic.name;
+                select.appendChild(opt);
+            }
+        }
+
+        async function generateMultiTopicAssignment() {
+            const subjectId = document.getElementById('assign-subject').value;
+            const moduleId = document.getElementById('assign-module').value;
+            const topicsSelect = document.getElementById('assign-topics');
+            const topicIds = Array.from(topicsSelect.selectedOptions).map(opt => opt.value);
+            const numQuestions = parseInt(document.getElementById('assign-num-questions').value, 10);
+
+            if (!topicIds.length) {
+                alert("Please select at least one topic.");
+                return;
+            }
+
+            // Create fully qualified topic IDs that include subject and module context
+            const qualifiedTopicIds = topicIds.map(topicId => {
+                return `${subjectId}_${moduleId}_${topicId}`;
+            });
+
+            // Fetch BKT params for all selected topics
+            const bktParams = {};
+            for (const topicId of topicIds) {
+                const qualifiedId = `${subjectId}_${moduleId}_${topicId}`;
+                const res = await fetch(`${API_URL}/student/${currentUser.id}/bkt/${qualifiedId}`, { headers: { 'user-id': currentUser.id } });
+                bktParams[topicId] = res.ok ? await res.json() : {};
+            }
+
+            document.getElementById('assign-spinner').classList.remove('hidden');
+            document.getElementById('assign-response').classList.add('hidden');
+
+            const response = await fetch(`${API_URL}/generate-multi-topic-assignment-bkt`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'user-id': currentUser.id },
+                body: JSON.stringify({
+                    subject_id: subjectId,
+                    module_id: moduleId,
+                    topic_ids: topicIds,
+                    num_questions_per_topic: numQuestions,
+                    bkt_params: bktParams
+                })
+            });
+            const data = await response.json();
+            document.getElementById('assign-spinner').classList.add('hidden');
+            document.getElementById('assign-response').classList.remove('hidden');
+            document.getElementById('assign-status').textContent = response.ok ? "Assignment generated!" : "Error";
+            document.getElementById('assign-result').textContent = JSON.stringify(data, null, 2);
         }
         
         // Function to move to next question

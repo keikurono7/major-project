@@ -73,10 +73,12 @@ def create_subject_with_nested_structure(teacher_id: str, syllabus_structure: di
                 'created_at': firestore.SERVER_TIMESTAMP
             })
             
-            # Create topics for this module
+            # Create topics for this module with GLOBALLY UNIQUE IDs
             topics = module.get('topics', [])
             for j, topic in enumerate(topics):
-                topic_id = f"topic_{j+1}"
+                # Create a unique topic ID that includes subject and module context
+                topic_id = f"{subject_id}_{module_id}_topic_{j+1}"
+                
                 topic_ref = module_ref.collection('topics').document(topic_id)
                 
                 topic_ref.set({

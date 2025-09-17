@@ -21,24 +21,16 @@ def generate_topic_assignment(
     module_name: str,
     topic_name: str,
     num_questions: int = 3,
-    student_id: Optional[str] = None
+    student_id: Optional[str] = None,
+    bkt_params: Optional[dict] = None
 ) -> Dict[str, Any]:
     """
-    Generate an assignment for a specific topic with difficulty
-    adjusted based on student mastery level.
+    Generate an assignment for a specific topic, using BKT params if provided.
     """
-    difficulty = "medium"  # Default difficulty
-    
-    # Adjust difficulty based on student mastery if student_id is provided
-    if student_id:
-        # Create a unique topic_id
-        topic_id = f"{subject_name}-{module_name}-{topic_name}".replace(" ", "_").lower()
-        
-        # Get student's BKT parameters for this topic
-        bkt_params = get_student_bkt_params(student_id, topic_id)
-        
-        # Adjust difficulty based on mastery probability
-        p_L = bkt_params.get("p_L", 0.5)
+    # Use bkt_params to adjust difficulty or focus
+    difficulty = "medium"
+    if bkt_params:
+        p_L = bkt_params.get("mastery_probability", 0.0)
         if p_L < 0.3:
             difficulty = "basic"
         elif p_L < 0.7:
