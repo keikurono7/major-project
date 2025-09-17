@@ -2,8 +2,61 @@
 
 import re
 import io
-from typing import Dict, Any
+import os
+from typing import Dict, Any, Union
 import fitz  # PyMuPDF
+
+def extract_syllabus_structure_from_pdf(pdf_source: Union[str, bytes, io.BytesIO], title: str = "Untitled Subject") -> Dict[str, Any]:
+    """
+    Extract syllabus structure directly from a PDF file.
+    
+    Args:
+        pdf_source: Path to PDF file, bytes of PDF file, or BytesIO object
+        title: Default title to use if not found in PDF
+        
+    Returns:
+        Dictionary containing the structured syllabus
+    """
+    # Extract text from PDF
+    text = extract_text_from_pdf(pdf_source)
+    
+    # Process the extracted text
+    return extract_syllabus_structure(text, title)
+
+def extract_text_from_pdf(pdf_source):
+    """
+    Extract text content from PDF
+    
+    Args:
+        pdf_source: Path to PDF file, bytes of PDF file, or BytesIO object
+        
+    Returns:
+        Extracted text as string
+    """
+    try:
+        # Handle different input types
+        if isinstance(pdf_source, str):
+            # It's a file path
+            if not os.path.exists(pdf_source):
+                raise FileNotFoundError(f"PDF file not found: {pdf_source}")
+            doc = fitz.open(pdf_source)
+        elif isinstance(pdf_source, bytes):
+            # It's raw bytes
+            doc = fitz.open(stream=io.BytesIO(pdf_source), filetype="pdf")
+        elif isinstance(pdf_source, io.BytesIO):
+            # It's a BytesIO object
+            doc = fitz.open(stream=pdf_source, filetype="pdf")
+        else:
+            raise TypeError("pdf_source must be a file path, bytes, or BytesIO object")
+            
+        # Extract text from all pages
+        text = ""
+        for page in doc:
+            text += page.get_text() + "\n"
+        doc.close()
+        return text
+    except Exception as e:
+        raise Exception(f"Error extracting text from PDF: {str(e)}")
 
 def extract_syllabus_structure(syllabus_text: str, title: str = "Untitled Subject") -> Dict[str, Any]:
     """
@@ -96,7 +149,7 @@ def extract_syllabus_structure(syllabus_text: str, title: str = "Untitled Subjec
                     cleaned_topic = topic_name.strip()
                     if len(cleaned_topic) > 5:  # Ensure the topic is meaningful
                         topics.append({"name": cleaned_topic, "content": ""})
-
+                
                 if topics:
                     modules.append({"name": module_name, "topics": topics})
             
@@ -106,27 +159,3 @@ def extract_syllabus_structure(syllabus_text: str, title: str = "Untitled Subjec
         print(f"Error extracting syllabus structure: {e}")
         # Even on error, use the provided title instead of default
         return {"name": title, "modules": []}
-
-# Add function for PDF extraction if needed
-def extract_text_from_pdf(pdf_bytes):
-    """
-    Extract text content from PDF bytes
-    
-    Args:
-        pdf_bytes: Raw bytes of PDF file or BytesIO object
-        
-    Returns:
-        Extracted text as string
-    """
-    try:
-        if isinstance(pdf_bytes, bytes):
-            pdf_bytes = io.BytesIO(pdf_bytes)
-            
-        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
-        text = ""
-        for page in doc:
-            text += page.get_text() + "\n"
-        doc.close()
-        return text
-    except Exception as e:
-        raise Exception(f"Error extracting text from PDF: {str(e)}")

@@ -6,14 +6,16 @@
     <title>Education Platform API Tester</title>
     <style>
         :root {
-            --primary: #4361ee;
-            --secondary: #3f37c9;
+            --primary: #858585;
+            --secondary: #6d6d74;
             --success: #4cc9f0;
             --danger: #f72585;
             --warning: #f8961e;
             --light: #f8f9fa;
             --dark: #212529;
             --gray: #6c757d;
+            --border-color: #ddd;
+            --primary-color: #898989;
         }
         
         * {
@@ -265,7 +267,209 @@
         @keyframes spin {
             to { transform: rotate(360deg); }
         }
+        
+        /* Add these styles to your existing CSS */
+        .options-list {
+          margin: 20px 0;
+        }
+        
+        .quiz-option {
+          display: flex;
+          align-items: center;
+          padding: 12px 15px;
+          margin-bottom: 10px;
+          border: 2px solid var(--border-color);
+          border-radius: 8px;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          background-color: white;
+        }
+        
+        .quiz-option:hover {
+          border-color: var(--primary-color);
+          background-color: rgba(0, 123, 255, 0.05);
+        }
+        
+        .quiz-option.selected {
+          border-color: var(--primary-color);
+          background-color: rgba(0, 123, 255, 0.1);
+        }
+        
+        .option-letter {
+          width: 30px;
+          height: 30px;
+          border-radius: 50%;
+          background-color: #f0f0f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-weight: bold;
+          margin-right: 12px;
+          flex-shrink: 0;
+        }
+        
+        .quiz-option.selected .option-letter {
+          background-color: var(--primary-color);
+          color: white;
+        }
+        
+        .option-text {
+          flex: 1;
+        }
+        
+        #question-text {
+          font-size: 1.2rem;
+          margin-bottom: 20px;
+          line-height: 1.5;
+        }
+        
+        #answer-feedback {
+          margin: 20px 0;
+          padding: 15px;
+          border-radius: 8px;
+          background-color: #f8f9fa;
+          border-left: 4px solid #6c757d;
+        }
+        
+        #feedback-text {
+          font-weight: bold;
+          margin-bottom: 8px;
+        }
+        
+        #explanation-text {
+          font-style: italic;
+        }
+        
+        /* Add these styles to your existing <style> section */
+        .progress-summary {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        
+        .mastery-overview {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin-top: 15px;
+        }
+        
+        .mastery-stat {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .stat-label {
+            font-size: 14px;
+            color: var(--gray);
+            display: block;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: bold;
+        }
+        
+        .progress-visualization {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        
+        .chart-container {
+            height: 300px;
+            margin-top: 15px;
+        }
+        
+        .subject-detail {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        
+        .module-list {
+            margin-top: 15px;
+        }
+        
+        .module-item {
+            margin-bottom: 20px;
+        }
+        
+        .module-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .module-name {
+            font-weight: bold;
+        }
+        
+        .module-mastery {
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            color: white;
+        }
+        
+        .topics-list {
+            margin-left: 20px;
+        }
+        
+        .topic-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .topic-bar {
+            height: 10px;
+            width: 100%;
+            background-color: #eee;
+            border-radius: 5px;
+            margin: 5px 0;
+            overflow: hidden;
+        }
+        
+        .topic-progress {
+            height: 100%;
+            border-radius: 5px;
+            transition: width 0.5s ease;
+        }
+        
+        .bkt-interpretation {
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        
+        .interpretation-levels {
+            margin-top: 15px;
+        }
+        
+        .level {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .level-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -363,8 +567,8 @@
                     <input type="text" id="syllabus-title" placeholder="Introduction to Computer Science" value="Computer Science 101">
                 </div>
                 <div class="input-group">
-                    <label for="syllabus-content">Syllabus Content:</label>
-                    <textarea id="syllabus-content" rows="15" placeholder="Paste your syllabus content here..."></textarea>
+                    <label for="syllabus-file">Upload PDF Syllabus:</label>
+                    <input type="file" id="syllabus-file" accept="application/pdf" class="file-input" required>
                 </div>
                 <button onclick="createCourseFromSyllabus()">Create Course</button>
                 <div id="syllabus-spinner" class="loading hidden"></div>
@@ -539,16 +743,68 @@
         <!-- Student Progress Tab -->
         <div class="tab-content" id="student">
             <div class="endpoint-section">
-                <h2 class="endpoint-title">Get Student BKT Parameters</h2>
-                <div class="input-group">
-                    <label for="bkt-topic">Topic ID:</label>
-                    <input type="text" id="bkt-topic" value="computer_science-programming_fundamentals-variables_and_data_types">
-                </div>
-                <button onclick="getStudentBKTParams()">Get BKT Parameters</button>
-                <div id="bkt-spinner" class="loading hidden"></div>
-                <div id="bkt-response" class="response hidden">
-                    <div class="status" id="bkt-status"></div>
-                    <pre id="bkt-result"></pre>
+                <h2 class="endpoint-title">Learning Progress Dashboard</h2>
+                <div id="progress-spinner" class="loading hidden"></div>
+                
+                <div id="progress-dashboard" class="hidden">
+                    <div class="progress-summary">
+                        <h3>Student Mastery Summary</h3>
+                        <div class="mastery-overview">
+                            <div class="mastery-stat">
+                                <span class="stat-label">Overall Mastery:</span>
+                                <span id="overall-mastery" class="stat-value">0%</span>
+                            </div>
+                            <div class="mastery-stat">
+                                <span class="stat-label">Strong Subjects:</span>
+                                <span id="strong-subjects" class="stat-value">-</span>
+                            </div>
+                            <div class="mastery-stat">
+                                <span class="stat-label">Areas for Improvement:</span>
+                                <span id="weak-subjects" class="stat-value">-</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="progress-visualization">
+                        <h3>Mastery by Subject</h3>
+                        <div class="chart-container">
+                            <canvas id="subjects-chart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div id="subject-details">
+                        <!-- Subject details will be added dynamically -->
+                    </div>
+                    
+                    <div class="bkt-interpretation">
+                        <h3>Understanding Your BKT Scores</h3>
+                        <div class="interpretation-levels">
+                            <div class="level">
+                                <div class="level-color" style="background-color: #f72585;"></div>
+                                <div class="level-description">
+                                    <strong>0-30%:</strong> Beginning - You're still developing foundational knowledge in this area.
+                                </div>
+                            </div>
+                            <div class="level">
+                                <div class="level-color" style="background-color: #f8961e;"></div>
+                                <div class="level-description">
+                                    <strong>30-60%:</strong> Developing - You're making good progress but still need practice.
+                                </div>
+                            </div>
+                            <div class="level">
+                                <div class="level-color" style="background-color: #90be6d;"></div>
+                                <div class="level-description">
+                                    <strong>60-80%:</strong> Proficient - You have a solid understanding of this material.
+                                </div>
+                            </div>
+                            <div class="level">
+                                <div class="level-color" style="background-color: #43aa8b;"></div>
+                                <div class="level-description">
+                                    <strong>80-100%:</strong> Mastery - You have excellent knowledge in this area.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -573,6 +829,9 @@
             } else {
                 // If not logged in, go to auth tab by default
                 setActiveTab('auth');
+            }
+            if (document.getElementById('student').classList.contains('active') && currentUser) {
+                initializeProgressTab();
             }
         });
         
@@ -785,21 +1044,25 @@
             
             try {
                 const title = document.getElementById('syllabus-title').value;
-                const syllabusText = document.getElementById('syllabus-content').value;
+                const syllabusFile = document.getElementById('syllabus-file').files[0];
                 
-                if (!syllabusText || syllabusText.trim() === '') {
-                    throw new Error('Syllabus content is empty. Please enter the syllabus text.');
+                if (!syllabusFile) {
+                    throw new Error('Please select a PDF syllabus file');
+                }
+                
+                if (!syllabusFile.name.toLowerCase().endsWith('.pdf')) {
+                    throw new Error('Please select a PDF file');
                 }
                 
                 const formData = new FormData();
-                formData.append('syllabus_text', syllabusText);
                 formData.append('title', title);
                 formData.append('teacher_id', currentUser.id);
+                formData.append('file', syllabusFile);
                 
                 const response = await fetch(`${API_URL}/create-course-from-syllabus`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${authToken}`
+                        'user-id': currentUser.id
                     },
                     body: formData
                 });
@@ -812,6 +1075,7 @@
                 hideLoading('syllabus');
             }
         }
+        
         
         async function generateTopicQuiz() {
             if (!currentUser) {
@@ -874,270 +1138,155 @@
         let currentQuestionIndex = 0;
         let userAnswers = [];
         let selectedOption = null;
-        
-        // Function to load all available subjects
-        async function loadSubjects() {
-            if (!currentUser) {
-                alert('Please login first');
-                setActiveTab('auth');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_URL}/subjects`, {
-                    headers: {
-                        'user-id': currentUser.id
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to load subjects: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                const subjectSelect = document.getElementById('quiz-subject-select');
-                
-                // Clear existing options except the first one
-                while (subjectSelect.options.length > 1) {
-                    subjectSelect.options.remove(1);
-                }
-                
-                // Add subjects to dropdown
-                data.subjects.forEach(subject => {
-                    const option = document.createElement('option');
-                    option.value = subject.id;
-                    option.textContent = subject.name;
-                    subjectSelect.appendChild(option);
-                });
-                
-            } catch (error) {
-                console.error('Error loading subjects:', error);
-                alert('Failed to load subjects. Please try again.');
-            }
+
+        // Helper to enable/disable submit
+        function setSubmitEnabled(enabled) {
+          const btn = document.getElementById('submit-answer-btn');
+          btn.disabled = !enabled;
         }
-        
-        // Function to load modules for selected subject
-        async function loadModulesForSubject() {
-            const subjectSelect = document.getElementById('quiz-subject-select');
-            const subjectId = subjectSelect.value;
-            
-            if (!subjectId) {
-                document.getElementById('module-selection').style.display = 'none';
-                document.getElementById('topic-selection').style.display = 'none';
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_URL}/subjects/${subjectId}/modules`, {
-                    headers: {
-                        'user-id': currentUser.id
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to load modules: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                const moduleSelect = document.getElementById('quiz-module-select');
-                
-                // Clear existing options except the first one
-                while (moduleSelect.options.length > 1) {
-                    moduleSelect.options.remove(1);
-                }
-                
-                // Add modules to dropdown
-                data.modules.forEach(module => {
-                    const option = document.createElement('option');
-                    option.value = module.id;
-                    option.textContent = module.name;
-                    moduleSelect.appendChild(option);
-                });
-                
-                // Show module selection
-                document.getElementById('module-selection').style.display = 'block';
-                // Hide topic selection until module is selected
-                document.getElementById('topic-selection').style.display = 'none';
-                
-            } catch (error) {
-                console.error('Error loading modules:', error);
-                alert('Failed to load modules. Please try again.');
-            }
+
+        // Helper to lock/unlock options after submit
+        function setOptionsEnabled(enabled) {
+          document.querySelectorAll('#options-container .quiz-option').forEach(el => {
+            el.style.pointerEvents = enabled ? 'auto' : 'none';
+            el.style.opacity = enabled ? '1' : '0.7';
+          });
         }
-        
-        // Function to load topics for selected module
-        async function loadTopicsForModule() {
-            const moduleSelect = document.getElementById('quiz-module-select');
-            const moduleId = moduleSelect.value;
-            
-            if (!moduleId) {
-                document.getElementById('topic-selection').style.display = 'none';
-                return;
-            }
-            
-            try {
-                const response = await fetch(`${API_URL}/modules/${moduleId}/topics`, {
-                    headers: {
-                        'user-id': currentUser.id
-                    }
-                });
-                
-                if (!response.ok) {
-                    throw new Error(`Failed to load topics: ${response.status}`);
-                }
-                
-                const data = await response.json();
-                const topicSelect = document.getElementById('quiz-topic-select');
-                
-                // Clear existing options except the first one
-                while (topicSelect.options.length > 1) {
-                    topicSelect.options.remove(1);
-                }
-                
-                // Add topics to dropdown
-                data.topics.forEach(topic => {
-                    const option = document.createElement('option');
-                    option.value = topic.id;
-                    option.textContent = topic.name;
-                    topicSelect.appendChild(option);
-                });
-                
-                // Show topic selection
-                document.getElementById('topic-selection').style.display = 'block';
-                
-            } catch (error) {
-                console.error('Error loading topics:', error);
-                alert('Failed to load topics. Please try again.');
-            }
+
+        // Select an option by letter
+        function selectOption(letter) {
+          const optionsContainer = document.getElementById('options-container');
+          optionsContainer.querySelectorAll('.quiz-option').forEach(el => {
+            el.classList.toggle('selected', el.dataset.letter === letter);
+          });
+          selectedOption = letter;
+          setSubmitEnabled(true);
         }
-        
+
         // Function to display the current quiz
         function displayQuiz() {
-            if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
-                return;
-            }
-            
-            // Show quiz section
-            document.getElementById('quiz-display-section').style.display = 'block';
-            
-            // Update progress
-            document.getElementById('total-questions').textContent = currentQuiz.questions.length;
-            document.getElementById('current-question').textContent = currentQuestionIndex + 1;
-            
-            // Get current question
-            const question = currentQuiz.questions[currentQuestionIndex];
-            
-            // Display question
-            document.getElementById('question-text').textContent = question.question;
-            
-            // Clear options container
-            const optionsContainer = document.getElementById('options-container');
-            optionsContainer.innerHTML = '';
-            
-            // Add options
-            question.options.forEach((option, index) => {
-                // Parse option text from "A) Option text" format
-                const optionLetter = option.substring(0, 1);
-                const optionText = option.substring(3);
-                
-                const optionElement = document.createElement('div');
-                optionElement.className = 'quiz-option';
-                optionElement.dataset.letter = optionLetter;
-                
-                optionElement.innerHTML = `
-                    <div class="option-letter">${optionLetter}</div>
-                    <div class="option-text">${optionText}</div>
-                `;
-                
-                // Add click handler
-                optionElement.addEventListener('click', () => {
-                    // Deselect all options
-                    document.querySelectorAll('.quiz-option').forEach(el => {
-                        el.classList.remove('selected');
-                    });
-                    
-                    // Select this option
-                    optionElement.classList.add('selected');
-                    selectedOption = optionLetter;
-                });
-                
-                optionsContainer.appendChild(optionElement);
+          if (!currentQuiz || !currentQuiz.questions || currentQuiz.questions.length === 0) {
+            return;
+          }
+
+          // Show quiz section
+          document.getElementById('quiz-display-section').style.display = 'block';
+
+          // Update progress
+          document.getElementById('total-questions').textContent = currentQuiz.questions.length;
+          document.getElementById('current-question').textContent = currentQuestionIndex + 1;
+
+          // Get current question
+          const question = currentQuiz.questions[currentQuestionIndex];
+
+          // Display question
+          document.getElementById('question-text').textContent = question.question;
+
+          // Clear options container
+          const optionsContainer = document.getElementById('options-container');
+          optionsContainer.innerHTML = '';
+
+          // Reset UI state for this question
+          selectedOption = null;
+          setSubmitEnabled(false);
+          setOptionsEnabled(true);
+          document.getElementById('answer-feedback').classList.add('hidden');
+          document.getElementById('submit-answer-btn').style.display = 'block';
+          document.getElementById('next-question-btn').style.display = 'none';
+          document.getElementById('finish-quiz-btn').style.display = 'none';
+
+          // Add options
+          question.options.forEach((option) => {
+            const optionLetter = option.substring(0, 1);
+            const optionText = option.substring(3);
+
+            const optionElement = document.createElement('div');
+            optionElement.className = 'quiz-option';
+            optionElement.dataset.letter = optionLetter;
+            optionElement.tabIndex = 0; // keyboard focus
+            optionElement.innerHTML = `
+              <div class="option-letter">${optionLetter}</div>
+              <div class="option-text">${optionText}</div>
+            `;
+
+            // Click to select
+            optionElement.addEventListener('click', () => selectOption(optionLetter));
+            // Keyboard select (Enter/Space)
+            optionElement.addEventListener('keydown', (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                selectOption(optionLetter);
+              }
             });
-            
-            // Reset UI state
-            document.getElementById('answer-feedback').classList.add('hidden');
-            document.getElementById('submit-answer-btn').style.display = 'block';
-            document.getElementById('next-question-btn').style.display = 'none';
-            document.getElementById('finish-quiz-btn').style.display = 'none';
-            selectedOption = null;
+
+            optionsContainer.appendChild(optionElement);
+          });
         }
-        
+
         // Function to submit answer for current question
         async function submitQuizAnswer() {
-            if (!selectedOption) {
-                alert('Please select an answer');
-                return;
-            }
-            
-            const question = currentQuiz.questions[currentQuestionIndex];
-            const isCorrect = selectedOption === question.answer;
-            
-            // Store the answer
-            userAnswers.push({
-                questionIndex: currentQuestionIndex,
-                selectedOption: selectedOption,
-                isCorrect: isCorrect
+          if (!selectedOption) {
+            alert('Please select an answer');
+            return;
+          }
+
+          const question = currentQuiz.questions[currentQuestionIndex];
+          const isCorrect = selectedOption.toUpperCase() === String(question.answer).toUpperCase();
+
+          // Store the answer
+          userAnswers.push({
+            questionIndex: currentQuestionIndex,
+            selectedOption: selectedOption,
+            isCorrect: isCorrect
+          });
+
+          // Lock options after submit
+          setOptionsEnabled(false);
+          setSubmitEnabled(false);
+
+          // Show feedback
+          const feedbackText = document.getElementById('feedback-text');
+          feedbackText.textContent = isCorrect ?
+            '✅ Correct!' :
+            `❌ Incorrect. The correct answer is ${question.answer}.`;
+
+          // Show explanation if available
+          document.getElementById('explanation-text').textContent = question.explanation || '';
+
+          document.getElementById('answer-feedback').classList.remove('hidden');
+
+          // Update BKT with the answer
+          try {
+            const topicId = currentQuiz.topic_id || document.getElementById('quiz-topic-select').value;
+
+            const response = await fetch(`${API_URL}/submit-quiz-response`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'user-id': currentUser.id
+              },
+              body: JSON.stringify({
+                student_id: currentUser.id,
+                topic_id: topicId,
+                is_correct: isCorrect
+              })
             });
-            
-            // Show feedback
-            const feedbackText = document.getElementById('feedback-text');
-            feedbackText.textContent = isCorrect ? 
-                '✅ Correct!' : 
-                `❌ Incorrect. The correct answer is ${question.answer}.`;
-            
-            // Show explanation if available
-            if (question.explanation) {
-                document.getElementById('explanation-text').textContent = question.explanation;
-            } else {
-                document.getElementById('explanation-text').textContent = '';
+
+            if (!response.ok) {
+              console.error('Failed to update BKT parameters');
             }
-            
-            document.getElementById('answer-feedback').classList.remove('hidden');
-            
-            // Update BKT with the answer
-            try {
-                // Extract topic ID from quiz
-                const topicId = currentQuiz.topic_id || document.getElementById('quiz-topic-select').value;
-                
-                const response = await fetch(`${API_URL}/submit-quiz-response`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'user-id': currentUser.id
-                    },
-                    body: JSON.stringify({
-                        student_id: currentUser.id,
-                        topic_id: topicId,
-                        is_correct: isCorrect
-                    })
-                });
-                
-                if (!response.ok) {
-                    console.error('Failed to update BKT parameters');
-                }
-                
-            } catch (error) {
-                console.error('Error updating BKT parameters:', error);
-            }
-            
-            // Show next button or finish button
-            document.getElementById('submit-answer-btn').style.display = 'none';
-            
-            if (currentQuestionIndex < currentQuiz.questions.length - 1) {
-                document.getElementById('next-question-btn').style.display = 'block';
-            } else {
-                document.getElementById('finish-quiz-btn').style.display = 'block';
-            }
+
+          } catch (error) {
+            console.error('Error updating BKT parameters:', error);
+          }
+
+          // Show next button or finish button
+          document.getElementById('submit-answer-btn').style.display = 'none';
+          if (currentQuestionIndex < currentQuiz.questions.length - 1) {
+            document.getElementById('next-question-btn').style.display = 'block';
+          } else {
+            document.getElementById('finish-quiz-btn').style.display = 'block';
+          }
         }
         
         // Function to move to next question
@@ -1211,6 +1360,803 @@
                 loadSubjects();
             }
         });
+        
+        // Global flag to track if subjects are already being loaded
+        let subjectsLoading = false;
+
+        async function loadSubjects() {
+            // Prevent duplicate calls
+            if (subjectsLoading) {
+                console.log("Subjects already loading, skipping duplicate call");
+                return;
+            }
+            
+            try {
+                subjectsLoading = true;
+                console.log("Loading subjects from " + API_URL);
+                const subjectSelect = document.getElementById('quiz-subject-select');
+                
+                // Clear existing options except the first placeholder
+                while (subjectSelect.options.length > 1) {
+                    subjectSelect.remove(1);
+                }
+                
+                // Show loading state
+                const placeholderOption = subjectSelect.options[0];
+                placeholderOption.text = "Loading subjects...";
+                
+                // Fetch subjects from the API
+                const response = await fetch(`${API_URL}/subjects`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch subjects: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log("Subjects loaded:", data.subjects);
+                
+                // Reset placeholder
+                placeholderOption.text = "-- Select a Subject --";
+                
+                // Add subjects to dropdown
+                if (data.subjects && data.subjects.length > 0) {
+                    data.subjects.forEach(subject => {
+                        const option = document.createElement('option');
+                        option.value = subject.id;
+                        option.textContent = subject.name;
+                        subjectSelect.appendChild(option);
+                    });
+                } else {
+                    console.log("No subjects returned from API");
+                    const option = document.createElement('option');
+                    option.disabled = true;
+                    option.textContent = "No subjects available";
+                    subjectSelect.appendChild(option);
+                }
+                
+                // Show the subject selection
+                document.getElementById('quiz-subject-select').style.display = 'block';
+                
+            } catch (error) {
+                console.error("Error loading subjects:", error);
+                const subjectSelect = document.getElementById('quiz-subject-select');
+                subjectSelect.options[0].text = "Error loading subjects";
+            } finally {
+                subjectsLoading = false;
+            }
+        }
+
+        // Add these functions to your script section at the end of the file
+        async function loadModulesForSubject() {
+            try {
+                const subjectId = document.getElementById('quiz-subject-select').value;
+                
+                if (!subjectId) {
+                    // Hide module and topic selections if no subject selected
+                    document.getElementById('module-selection').style.display = 'none';
+                    document.getElementById('topic-selection').style.display = 'none';
+                    return;
+                }
+                
+                // Show loading state
+                document.getElementById('module-selection').style.display = 'block';
+                const moduleSelect = document.getElementById('quiz-module-select');
+                moduleSelect.innerHTML = '<option value="">Loading modules...</option>';
+                
+                // Fetch modules from API
+                const response = await fetch(`${API_URL}/subjects/${subjectId}/modules`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch modules: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log("Modules loaded:", data);
+                
+                // Reset select options
+                moduleSelect.innerHTML = '<option value="">-- Select a Module --</option>';
+                
+                // Add modules to dropdown
+                if (data.modules && data.modules.length > 0) {
+                    data.modules.forEach(module => {
+                        const option = document.createElement('option');
+                        option.value = module.id;
+                        option.textContent = module.name;
+                        moduleSelect.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.disabled = true;
+                    option.textContent = "No modules available";
+                    moduleSelect.appendChild(option);
+                }
+                
+                // Hide topic selection until module is selected
+                document.getElementById('topic-selection').style.display = 'none';
+                
+            } catch (error) {
+                console.error("Error loading modules:", error);
+                const moduleSelect = document.getElementById('quiz-module-select');
+                moduleSelect.innerHTML = '<option value="">Error loading modules</option>';
+            }
+        }
+
+        async function loadTopicsForModule() {
+            try {
+                const subjectId = document.getElementById('quiz-subject-select').value;
+                const moduleId = document.getElementById('quiz-module-select').value;
+                
+                if (!moduleId) {
+                    // Hide topic selection if no module selected
+                    document.getElementById('topic-selection').style.display = 'none';
+                    return;
+                }
+                
+                // Show loading state
+                document.getElementById('topic-selection').style.display = 'block';
+                const topicSelect = document.getElementById('quiz-topic-select');
+                topicSelect.innerHTML = '<option value="">Loading topics...</option>';
+                
+                // Fetch topics from API
+                const response = await fetch(`${API_URL}/modules/${moduleId}/topics`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch topics: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log("Topics loaded:", data);
+                
+                // Reset select options
+                topicSelect.innerHTML = '<option value="">-- Select a Topic --</option>';
+                
+                // Add topics to dropdown
+                if (data.topics && data.topics.length > 0) {
+                    data.topics.forEach(topic => {
+                        const option = document.createElement('option');
+                        option.value = topic.id;
+                        option.textContent = topic.name;
+                        topicSelect.appendChild(option);
+                    });
+                } else {
+                    const option = document.createElement('option');
+                    option.disabled = true;
+                    option.textContent = "No topics available";
+                    topicSelect.appendChild(option);
+                }
+                
+            } catch (error) {
+                console.error("Error loading topics:", error);
+                const topicSelect = document.getElementById('quiz-topic-select');
+                topicSelect.innerHTML = '<option value="">Error loading topics</option>';
+            }
+        }
+
+        // Simplified event handler
+        document.addEventListener('DOMContentLoaded', function() {
+            const quizTab = document.querySelector('.tab[data-tab="quiz"]');
+            if (quizTab) {
+                quizTab.addEventListener('click', function() {
+                    if (currentUser) {
+                        loadSubjects();
+                    }
+                });
+            }
+            
+            // Only call once on page load if quiz tab is active
+            if (document.getElementById('quiz').style.display !== 'none' && currentUser) {
+                loadSubjects();
+            }
+        });
+        
+        // Function to generate a question paper
+        async function generateQuestionPaper() {
+            if (!currentUser) {
+                alert('Please login first');
+                setActiveTab('auth');
+                return;
+            }
+            
+            showLoading('paper');
+            
+            try {
+                const subjectId = document.getElementById('paper-subject-id').value;
+                const pastPaperText = document.getElementById('paper-text').value;
+                
+                if (!subjectId) {
+                    throw new Error('Please enter a subject ID');
+                }
+                
+                const response = await fetch(`${API_URL}/generate-question-paper`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    },
+                    body: JSON.stringify({
+                        subject_id: subjectId,
+                        past_paper_text: pastPaperText || null
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    showResponse('paper', 'Question paper generation started', true, {
+                        ...data,
+                        note: "The paper is being generated in the background. Click 'List Papers' to check when it's ready."
+                    });
+                } else {
+                    showResponse('paper', 'Failed to generate question paper', false, data);
+                }
+            } catch (error) {
+                showResponse('paper', 'Error', false, error.message);
+            } finally {
+                hideLoading('paper');
+            }
+        }
+
+        // Function to list all generated question papers
+        async function listQuestionPapers() {
+            if (!currentUser) {
+                alert('Please login first');
+                setActiveTab('auth');
+                return;
+            }
+            
+            showLoading('paper-list');
+            
+            try {
+                const response = await fetch(`${API_URL}/question-papers`, {
+                    headers: {
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Add download links to the papers
+                    const papersWithLinks = {
+                        ...data,
+                        question_papers: data.question_papers.map(paper => ({
+                            ...paper,
+                            download_link: `${API_URL}/question-papers/${paper.filename}`
+                        }))
+                    };
+                    
+                    showResponse('paper-list', 'Papers retrieved successfully', true, papersWithLinks);
+                    
+                    // If there are papers, add clickable links to view them
+                    if (data.question_papers && data.question_papers.length > 0) {
+                        setTimeout(() => {
+                            const resultElement = document.getElementById('paper-list-result');
+                            
+                            // Find all download_link entries and convert them to actual links
+                            resultElement.innerHTML = resultElement.innerHTML.replace(
+                                /\"download_link\": \"(.+?)\"/g,
+                                '"download_link": "<a href="$1" target="_blank">Click to view/download</a>"'
+                            );
+                        }, 100);
+                    }
+                } else {
+                    showResponse('paper-list', 'Failed to retrieve papers', false, data);
+                }
+            } catch (error) {
+                showResponse('paper-list', 'Error', false, error.message);
+            } finally {
+                hideLoading('paper-list');
+            }
+        }
+
+        // Function to get mastery color based on score
+        function getMasteryColor(score) {
+            if (score < 0.3) return '#f72585';
+            if (score < 0.6) return '#f8961e';
+            if (score < 0.8) return '#90be6d';
+            return '#43aa8b';
+        }
+
+        // Function to get mastery level text based on score
+        function getMasteryLevelText(score) {
+            if (score < 0.3) return 'Beginning';
+            if (score < 0.6) return 'Developing';
+            if (score < 0.8) return 'Proficient';
+            return 'Mastery';
+        }
+
+        // Load student progress for current user
+        async function loadStudentProgress() {
+            if (!currentUser) {
+                alert('Please login first');
+                setActiveTab('auth');
+                return;
+            }
+            
+            showLoading('progress');
+            document.getElementById('progress-dashboard').classList.add('hidden');
+            
+            try {
+                const response = await fetch(`${API_URL}/student/${currentUser.id}/progress`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch progress: ${response.status}`);
+                }
+                
+                const progressData = await response.json();
+                progressData = normalizeProgressData(progressData);
+                // Process and display the data
+                displayProgressDashboard(progressData);
+                
+            } catch (error) {
+                alert('Error loading progress data: ' + error.message);
+                console.error('Error loading progress:', error);
+            } finally {
+                hideLoading('progress');
+            }
+        }
+
+        // Add this function to initialize the progress tab when it's selected
+        function initializeProgressTab() {
+            if (!currentUser) return;
+            
+            // Auto-load progress data when tab is shown
+            document.getElementById('progress-dashboard').classList.add('hidden');
+            document.getElementById('progress-spinner').classList.remove('hidden');
+            
+            // Try direct BKT data approach since /progress endpoint returns 404
+            loadStudentProgressFromBKT();
+        }
+
+        // New function to load progress data directly from BKT endpoints
+        async function loadStudentProgressFromBKT() {
+            try {
+                // First load all subjects
+                const subjectsResponse = await fetch(`${API_URL}/subjects`, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'user-id': currentUser.id
+                    }
+                });
+                
+                if (!subjectsResponse.ok) {
+                    throw new Error("Failed to fetch subjects");
+                }
+                
+                const subjectsData = await subjectsResponse.json();
+                const subjects = subjectsData.subjects || [];
+                
+                // Build the full structure with mastery data
+                const progressData = { subjects: {} };
+                
+                // For each subject, get modules, topics, and BKT data
+                for (const subject of subjects) {
+                    progressData.subjects[subject.id] = {
+                        subject_name: subject.name,
+                        modules: {}
+                    };
+                    
+                    // Fetch modules for this subject
+                    const modulesResponse = await fetch(`${API_URL}/subjects/${subject.id}/modules`, {
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'user-id': currentUser.id
+                        }
+                    });
+                    
+                    if (!modulesResponse.ok) continue;
+                    
+                    const modulesData = await modulesResponse.json();
+                    const modules = modulesData.modules || [];
+                    
+                    // For each module, get topics
+                    for (const module of modules) {
+                        progressData.subjects[subject.id].modules[module.id] = {
+                            module_name: module.name,
+                            topics: {}
+                        };
+                        
+                        // Fetch topics for this module
+                        const topicsResponse = await fetch(`${API_URL}/modules/${module.id}/topics`, {
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'user-id': currentUser.id
+                            }
+                        });
+                        
+                        if (!topicsResponse.ok) continue;
+                        
+                        const topicsData = await topicsResponse.json();
+                        const topics = topicsData.topics || [];
+                        
+                        // For each topic, get BKT data
+                        for (const topic of topics) {
+                            // Fetch BKT data for this topic
+                            const bktResponse = await fetch(`${API_URL}/student/${currentUser.id}/bkt/${topic.id}`, {
+                                headers: {
+                                    'user-id': currentUser.id
+                                }
+                            });
+                            
+                            if (!bktResponse.ok) {
+                                // Default values if BKT data not available
+                                progressData.subjects[subject.id].modules[module.id].topics[topic.id] = {
+                                    p_L: 0.0,
+                                    p_L0: 0.0,
+                                    p_T: 0.1,
+                                    p_G: 0.2,
+                                    p_S: 0.1,
+                                    topic_name: topic.name
+                                };
+                                continue;
+                            }
+                            
+                            const bktData = await bktResponse.json();
+                            progressData.subjects[subject.id].modules[module.id].topics[topic.id] = {
+                                p_L: bktData.mastery_probability || 0.0,
+                                p_L0: 0.0,
+                                p_T: bktData.learning_rate || 0.1,
+                                p_G: 0.2,
+                                p_S: 0.1,
+                                topic_name: topic.name
+                            };
+                        }
+                    }
+                }
+                
+                // Now display the data with our existing function
+                displayProgressDashboard(progressData);
+                
+            } catch (error) {
+                console.error('Failed to load progress data:', error);
+                document.getElementById('progress-spinner').classList.add('hidden');
+                document.getElementById('progress-dashboard').classList.remove('hidden');
+                document.getElementById('overall-mastery').textContent = 'Error loading data';
+            }
+        }
+
+        // Add this listener to auto-load data when tab is selected
+        document.querySelector('.tab[data-tab="student"]').addEventListener('click', initializeProgressTab);
+
+        // Display progress dashboard
+        function displayProgressDashboard(progressData) {
+            // Show the dashboard
+            document.getElementById('progress-dashboard').classList.remove('hidden');
+            
+            // If no data or empty data, show placeholder
+            if (!progressData || !progressData.subjects || Object.keys(progressData.subjects).length === 0) {
+                document.getElementById('overall-mastery').textContent = 'No data available';
+                return;
+            }
+            
+            // Process and organize data
+            const subjectsData = processProgressData(progressData);
+            
+            // Update summary stats
+            updateSummaryStats(subjectsData);
+            
+            // Create subjects chart
+            createSubjectsChart(subjectsData);
+            
+            // Create detailed breakdown by subject
+            createSubjectDetails(subjectsData);
+        }
+
+        // Process raw progress data into a more usable format
+        function processProgressData(progressData) {
+            const subjects = [];
+            
+            // Process each subject
+            for (const [subjectId, subjectData] of Object.entries(progressData.subjects || {})) {
+                const modules = [];
+                let subjectTotalMastery = 0;
+                let subjectTopicCount = 0;
+                
+                // Process each module in the subject
+                for (const [moduleId, moduleData] of Object.entries(subjectData.modules || {})) {
+                    const topics = [];
+                    let moduleTotalMastery = 0;
+                    let moduleTopicCount = 0;
+                    
+                    // Process each topic in the module
+                    for (const [topicId, topicData] of Object.entries(moduleData.topics || {})) {
+                        // Get the actual mastery value for this specific topic
+                        const mastery = topicData.p_L || 0;
+                        
+                        topics.push({
+                            id: topicId,
+                            name: topicData.topic_name || `Topic ${topicId}`,
+                            mastery: mastery
+                        });
+                        
+                        // Add to module total
+                        moduleTotalMastery += mastery;
+                        moduleTopicCount++;
+                    }
+                    
+                    // Calculate true module average
+                    const moduleMastery = moduleTopicCount > 0 ? moduleTotalMastery / moduleTopicCount : 0;
+                    
+                    modules.push({
+                        id: moduleId,
+                        name: moduleData.module_name || `Module ${moduleId}`,
+                        mastery: moduleMastery,
+                        topics: topics.sort((a, b) => a.name.localeCompare(b.name)) // Sort topics by name
+                    });
+                    
+                    // Add to subject total (using actual module totals)
+                    subjectTotalMastery += moduleTotalMastery;
+                    subjectTopicCount += moduleTopicCount;
+                }
+                
+                // Calculate true subject average
+                const subjectMastery = subjectTopicCount > 0 ? subjectTotalMastery / subjectTopicCount : 0;
+                
+                subjects.push({
+                    id: subjectId,
+                    name: subjectData.subject_name || `Subject ${subjectId}`,
+                    mastery: subjectMastery,
+                    modules: modules.sort((a, b) => a.name.localeCompare(b.name)) // Sort modules by name
+                });
+            }
+            
+            return subjects;
+        }
+
+        // Update the summary statistics
+        function updateSummaryStats(subjectsData) {
+            // Calculate overall mastery
+            let totalMastery = 0;
+            let subjectCount = subjectsData.length;
+            
+            subjectsData.forEach(subject => {
+                totalMastery += subject.mastery;
+            });
+            
+            const overallMastery = subjectCount > 0 ? totalMastery / subjectCount : 0;
+            document.getElementById('overall-mastery').textContent = `${(overallMastery * 100).toFixed(1)}%`;
+            
+            // Find strong and weak subjects
+            const sortedSubjects = [...subjectsData].sort((a, b) => b.mastery - a.mastery);
+            
+            const strongSubjects = sortedSubjects
+                .filter(s => s.mastery >= 0.7)
+                .map(s => s.name)
+                .join(', ');
+            
+            const weakSubjects = sortedSubjects
+                .filter(s => s.mastery < 0.5)
+                .map(s => s.name)
+                .join(', ');
+            
+            document.getElementById('strong-subjects').textContent = strongSubjects || 'None yet';
+            document.getElementById('weak-subjects').textContent = weakSubjects || 'None';
+        }
+
+        // Create the subjects chart
+        function createSubjectsChart(subjectsData) {
+            const ctx = document.getElementById('subjects-chart').getContext('2d');
+            
+            // Extract data for chart
+            const labels = subjectsData.map(s => s.name);
+            const data = subjectsData.map(s => s.mastery * 100); // Convert to percentage
+            const backgroundColor = subjectsData.map(s => getMasteryColor(s.mastery));
+            
+            // Create chart
+            if (window.subjectsChart) {
+                window.subjectsChart.destroy();
+            }
+            
+            window.subjectsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Mastery Level (%)',
+                        data: data,
+                        backgroundColor: backgroundColor,
+                        borderColor: backgroundColor,
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Mastery Level (%)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const score = context.raw;
+                                    return `Mastery: ${score.toFixed(1)}% (${getMasteryLevelText(score/100)})`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Create detailed breakdown by subject
+        function createSubjectDetails(subjectsData) {
+            const detailsContainer = document.getElementById('subject-details');
+            detailsContainer.innerHTML = '';
+            
+            subjectsData.forEach(subject => {
+                const subjectElement = document.createElement('div');
+                subjectElement.className = 'subject-detail';
+                
+                const subjectMasteryPercent = (subject.mastery * 100).toFixed(1);
+                const masteryColor = getMasteryColor(subject.mastery);
+                
+                subjectElement.innerHTML = `
+                    <h3>${subject.name} 
+                        <span style="color: ${masteryColor};">(${subjectMasteryPercent}% - ${getMasteryLevelText(subject.mastery)})</span>
+                    </h3>
+                    <div class="module-list"></div>
+                `;
+                
+                const moduleList = subjectElement.querySelector('.module-list');
+                
+                subject.modules.forEach(module => {
+                    const moduleElement = document.createElement('div');
+                    moduleElement.className = 'module-item';
+                    
+                    const moduleMasteryPercent = (module.mastery * 100).toFixed(1);
+                    const moduleMasteryColor = getMasteryColor(module.mastery);
+                    
+                    moduleElement.innerHTML = `
+                        <div class="module-header">
+                            <span class="module-name">${module.name}</span>
+                            <span class="module-mastery" style="background-color: ${moduleMasteryColor};">
+                                ${moduleMasteryPercent}%
+                            </span>
+                        </div>
+                        <div class="topics-list"></div>
+                    `;
+                    
+                    const topicsList = moduleElement.querySelector('.topics-list');
+                    
+                    module.topics.forEach(topic => {
+                        const topicElement = document.createElement('div');
+                        topicElement.className = 'topic-item';
+                        
+                        const topicMasteryPercent = (topic.mastery * 100).toFixed(1);
+                        const topicMasteryColor = getMasteryColor(topic.mastery);
+                        
+                        topicElement.innerHTML = `
+                            <div class="topic-name">${topic.name}</div>
+                            <div class="topic-mastery">${topicMasteryPercent}%</div>
+                            <div class="topic-bar">
+                                <div class="topic-progress" 
+                                    style="width: ${topicMasteryPercent}%; background-color: ${topicMasteryColor};"></div>
+                            </div>
+                        `;
+                        
+                        topicsList.appendChild(topicElement);
+                    });
+                    
+                    moduleList.appendChild(moduleElement);
+                });
+                
+                detailsContainer.appendChild(subjectElement);
+            });
+        }
+
+        function showLoading(elementId) {
+            document.getElementById(`${elementId}-spinner`).classList.remove('hidden');
+        }
+
+        function hideLoading(elementId) {
+            document.getElementById(`${elementId}-spinner`).classList.add('hidden');
+        }
+
+        // Add this function to detect and fix duplicate topic mastery values
+        function normalizeProgressData(progressData) {
+            // First, identify topics with same mastery value by position
+            const firstTopicMasteryValues = new Map(); // Store mastery values by module
+
+            // Check if first topics in each module have identical non-zero mastery values
+            for (const subjectId in progressData.subjects) {
+                const subject = progressData.subjects[subjectId];
+                
+                for (const moduleId in subject.modules) {
+                    const module = subject.modules[moduleId];
+                    const topicIds = Object.keys(module.topics);
+                    
+                    if (topicIds.length === 0) continue;
+                    
+                    // Get first topic in each module
+                    const firstTopicId = topicIds[0];
+                    const firstTopic = module.topics[firstTopicId];
+                    const mastery = firstTopic.p_L;
+                    
+                    // Skip zero values
+                    if (mastery === 0) continue;
+                    
+                    // Store the mastery value with the module ID
+                    if (mastery > 0) {
+                        firstTopicMasteryValues.set(moduleId, {
+                            topicId: firstTopicId,
+                            mastery: mastery
+                        });
+                    }
+                }
+            }
+            
+            // Check if we have duplicate values
+            const uniqueMasteryValues = new Set();
+            const duplicatesExist = Array.from(firstTopicMasteryValues.values()).some(info => {
+                if (uniqueMasteryValues.has(info.mastery)) {
+                    return true;
+                }
+                uniqueMasteryValues.add(info.mastery);
+                return false;
+            });
+            
+            // If duplicates exist, we need to fix the data
+            if (duplicatesExist) {
+                console.warn("Detected duplicate topic mastery values across modules - fixing data");
+                
+                // Keep only the first instance of each mastery value
+                const seenMasteryValues = new Set();
+                
+                for (const subjectId in progressData.subjects) {
+                    const subject = progressData.subjects[subjectId];
+                    
+                    for (const moduleId in subject.modules) {
+                        const module = subject.modules[moduleId];
+                        const topicIds = Object.keys(module.topics);
+                        
+                        if (topicIds.length === 0) continue;
+                        
+                        // Check first topic
+                        const firstTopicId = topicIds[0];
+                        const firstTopic = module.topics[firstTopicId];
+                        const mastery = firstTopic.p_L;
+                        
+                        // If this mastery has been seen before, reset it
+                        if (mastery > 0 && seenMasteryValues.has(mastery)) {
+                            console.log(`Resetting duplicate mastery ${mastery} for topic ${firstTopicId}`);
+                            firstTopic.p_L = 0.0;
+                        } else if (mastery > 0) {
+                            seenMasteryValues.add(mastery);
+                        }
+                    }
+                }
+            }
+            
+            return progressData;
+        }
     </script>
 </body>
 </html>

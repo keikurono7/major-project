@@ -1,22 +1,28 @@
 # firebase_ops.py
 
 from firebase_admin import firestore, credentials, initialize_app
-import firebase_admin
+import firebase_admin  # Add this import
 from config import SERVICE_ACCOUNT_FILE
 from typing import Dict, Any, Optional
 from datetime import datetime
+import os  # Add this import
 
 # --- Firebase Initialization ---
 try:
     if not firebase_admin._apps:
+        # Check if file exists first
+        if not os.path.exists(SERVICE_ACCOUNT_FILE):
+            raise FileNotFoundError(f"Service account file not found at: {SERVICE_ACCOUNT_FILE}")
+            
         cred = credentials.Certificate(SERVICE_ACCOUNT_FILE)
         initialize_app(cred)
+        
     db = firestore.client()
     print("✅ Firebase connection successful.")
 except Exception as e:
     print(f"❌ FATAL: Failed to initialize Firebase. Error: {e}")
     db = None
-    raise
+    # Don't raise here - let the app continue but with limited functionality
 
 def create_subject_with_nested_structure(teacher_id: str, syllabus_structure: dict) -> str:
     """
@@ -171,36 +177,182 @@ def get_subject_structure(subject_id: str) -> Dict[str, Any]:
 
 def get_student_bkt_params(student_id: str, topic_id: str) -> Dict[str, float]:
     """
-    Retrieve BKT parameters for a specific student and topic.
-    If no parameters exist, returns default values.
+    Get Bayesian Knowledge Tracing parameters for a student on a specific topic.
+    Checks directly in the users/{student_id} document.
+    
+    Args:
+        student_id: ID of the student
+        topic_id: ID of the topic
+        
+    Returns:
+        Dictionary containing BKT parameters
     """
-    from firebase_admin import firestore
-    
-    db = firestore.client()
-    doc_ref = db.collection('student_data').document(student_id).collection('bkt_params').document(topic_id)
-    doc = doc_ref.get()
-    
-    if doc.exists:
-        return doc.to_dict()
-    else:
-        # Return default BKT parameters
-        return {
-            "p_L0": 0.5,  # Initial probability of mastery
-            "p_T": 0.1,   # Probability of learning if not mastered
-            "p_G": 0.2,   # Probability of guessing correctly if not mastered
-            "p_S": 0.1,   # Probability of making a mistake if mastered
-            "p_L": 0.5    # Current probability of mastery (starts at p_L0)
-        }
+    try:
+        if not db:
+            print(f"⚠️ Firebase unavailable, returning default BKT params for {student_id} on {topic_id}")
+            return get_default_bkt_params()
+        
+        print(f"Retrieving BKT parameters for student {student_id} on topic {topic_id}")
+        
+        # Get the user document
+        user_ref = db.collection('users').document(student_id)
+        user_doc = user_ref.get()
+        
+        if user_doc.exists:
+            user_data = user_doc.to_dict() or {}
+            
+            # First check if we have it in the mastery summary
+            if "mastery_summary" in user_data:
+                for subject_id, topics in user_data["mastery_summary"].items():
+                    if topic_id in topics:
+                        topic_data = topics[topic_id]
+                        print(f"Found BKT params in mastery summary")
+                        
+                        # Convert summary to full BKT params
+                        params = get_default_bkt_params()
+                        params["p_L"] = topic_data.get("mastery", 0.0)
+                        return params
+            
+            # If not in summary, search the full structure
+            if "mastery" in user_data:
+                mastery = user_data["mastery"]
+                
+                # Check unknown topics first (simpler path)
+                if "unknown_topics" in mastery and topic_id in mastery["unknown_topics"]:
+                    params = mastery["unknown_topics"][topic_id]
+                    print(f"Found BKT parameters in unknown_topics")
+                    return params
+                    
+                # Search through subjects structure
+                if "subjects" in mastery:
+                    for subject_id, subject_data in mastery["subjects"].items():
+                        if "modules" in subject_data:
+                            for module_id, module_data in subject_data["modules"].items():
+                                if "topics" in module_data and topic_id in module_data["topics"]:
+                                    params = module_data["topics"][topic_id]
+                                    print(f"Found BKT parameters in user mastery structure")
+                                    
+                                    # Ensure all required fields exist
+                                    default_params = get_default_bkt_params()
+                                    for key, value in default_params.items():
+                                        if key not in params:
+                                            params[key] = value
+                                            
+                                    return params
+        
+        # If we got here, we didn't find the parameters in the user document
+        # Create default parameters
+        print(f"No BKT parameters found for {student_id} on {topic_id}, using defaults")
+        return get_default_bkt_params()
+            
+    except Exception as e:
+        print(f"Error retrieving BKT parameters: {e}")
+        return get_default_bkt_params()
+
 
 def update_student_bkt_params(student_id: str, topic_id: str, bkt_params: Dict[str, float]) -> None:
     """
-    Update BKT parameters for a specific student and topic.
-    """
-    from firebase_admin import firestore
+    Update Bayesian Knowledge Tracing parameters for a student on a specific topic.
+    Stores data directly in the users/{student_id} document.
     
-    db = firestore.client()
-    doc_ref = db.collection('student_data').document(student_id).collection('bkt_params').document(topic_id)
-    doc_ref.set(bkt_params, merge=True)
+    Args:
+        student_id: ID of the student
+        topic_id: ID of the topic
+        bkt_params: Dictionary containing BKT parameters
+    """
+    try:
+        if not db:
+            print(f"⚠️ Firebase unavailable, cannot update BKT params for {student_id} on {topic_id}")
+            return
+        
+        # Add timestamp to track when the parameters were last updated
+        bkt_params["last_updated"] = firestore.SERVER_TIMESTAMP
+        
+        # Find the subject/module that contains this topic
+        subjects = get_all_subjects()
+        topic_path_found = False
+        
+        for subject in subjects:
+            subject_id = subject["id"]
+            modules = get_subject_modules(subject_id)
+            
+            for module in modules:
+                module_id = module["id"]
+                topics = get_module_topics(subject_id, module_id)
+                
+                for topic in topics:
+                    if topic["id"] == topic_id:
+                        # Found the topic, update in user's document
+                        user_ref = db.collection('users').document(student_id)
+                        
+                        # Set the mastery data path
+                        mastery_path = f"mastery.subjects.{subject_id}.modules.{module_id}.topics.{topic_id}"
+                        
+                        # Prepare update data
+                        update_data = {
+                            f"{mastery_path}.p_L": bkt_params.get("p_L", 0.0),
+                            f"{mastery_path}.p_L0": bkt_params.get("p_L0", 0.0),
+                            f"{mastery_path}.p_T": bkt_params.get("p_T", 0.1),
+                            f"{mastery_path}.p_G": bkt_params.get("p_G", 0.2),
+                            f"{mastery_path}.p_S": bkt_params.get("p_S", 0.1),
+                            f"{mastery_path}.attempts": bkt_params.get("attempts", 0) + 1,
+                            f"{mastery_path}.correct": bkt_params.get("correct", 0) + (1 if bkt_params.get("is_correct", False) else 0),
+                            f"{mastery_path}.last_updated": firestore.SERVER_TIMESTAMP,
+                            f"{mastery_path}.topic_name": topic.get("name", ""),
+                            f"{mastery_path}.subject_name": subject.get("name", ""),
+                            f"{mastery_path}.module_name": module.get("name", "")
+                        }
+                        
+                        # Update user document directly
+                        user_ref.update(update_data)
+                        
+                        # Also add a summary for quick access
+                        user_ref.update({
+                            f"mastery_summary.{subject_id}.{topic_id}": {
+                                "mastery": bkt_params.get("p_L", 0.0),
+                                "topic_name": topic.get("name", ""),
+                                "module_name": module.get("name", ""),
+                                "subject_name": subject.get("name", ""),
+                                "last_updated": firestore.SERVER_TIMESTAMP
+                            }
+                        })
+                        
+                        print(f"✅ Updated student mastery in user document")
+                        topic_path_found = True
+                        break
+                        
+                if topic_path_found:
+                    break
+            if topic_path_found:
+                break
+        
+        if not topic_path_found:
+            print(f"⚠️ Could not find topic path for {topic_id}, saving direct reference only")
+            # Save in the user document with minimal info
+            user_ref = db.collection('users').document(student_id)
+            user_ref.update({
+                f"mastery.unknown_topics.{topic_id}": bkt_params
+            })
+            
+        print(f"✅ Successfully updated BKT parameters for {student_id} on {topic_id}")
+        
+    except Exception as e:
+        print(f"❌ Error updating BKT parameters: {e}")
+        import traceback
+        traceback.print_exc()
+
+
+def get_default_bkt_params() -> Dict[str, float]:
+    """Get default BKT parameters for a new student-topic combination"""
+    return {
+        "p_L0": 0.0,  # Initial mastery (prior)
+        "p_L": 0.0,   # Current mastery estimate
+        "p_T": 0.1,   # Learning rate (transition probability)
+        "p_G": 0.2,   # Guess probability
+        "p_S": 0.1,   # Slip probability
+        "attempts": 0,
+        "correct": 0
+    }
 
 def get_all_subjects():
     """
@@ -209,16 +361,35 @@ def get_all_subjects():
     Returns:
         List of dictionaries containing subject id and name
     """
+        
     try:
+        print("Fetching all subjects from Firestore...")
+        
+        # Attempt to get collection reference - debug output
         subjects_ref = db.collection('subjects')
+        print(f"Got collection reference: {subjects_ref}")
+        
+        # Get documents with increased timeout and debug
+        print("Starting document fetch...")
+        docs = subjects_ref.get(timeout=30)  # Increased timeout to 30 seconds
+        print(f"Fetch completed, processing documents")
+        
         subjects = []
-        for doc in subjects_ref.get():
+        doc_count = 0
+        for doc in docs:
+            doc_count += 1
             data = doc.to_dict() or {}
-            subjects.append({"id": doc.id, "name": data.get("name", "Unnamed Subject")})
-        print(f"Retrieved {len(subjects)} subjects")
+            subjects.append({
+                "id": doc.id,
+                "name": data.get("name", "Unnamed Subject")
+            })
+            print(f"Processed document: {doc.id} - {data.get('name', 'Unnamed')}")
+            
+        print(f"Retrieved {len(subjects)} subjects from {doc_count} documents")
         return subjects
     except Exception as e:
         print(f"Error retrieving subjects: {e}")
+        # Return empty list rather than failing completely
         return []
 
 def get_subject_modules(subject_id):
@@ -288,7 +459,7 @@ def update_student_topic_response(student_id, topic_id, is_correct):
         bkt_params = get_student_bkt_params(student_id, topic_id)
         
         # Update mastery probability using BKT update rule
-        p_L = bkt_params.get("p_L", 0.5)  # Current mastery probability
+        p_L = bkt_params.get("p_L", 0.0)  # Current mastery probability
         p_T = bkt_params.get("p_T", 0.1)  # Learning probability
         p_G = bkt_params.get("p_G", 0.2)  # Guess probability
         p_S = bkt_params.get("p_S", 0.1)  # Slip probability
@@ -313,7 +484,7 @@ def update_student_topic_response(student_id, topic_id, is_correct):
         
         # Update BKT parameters
         updated_params = {
-            "p_L0": bkt_params.get("p_L0", 0.5),
+            "p_L0": bkt_params.get("p_L0", 0.0),
             "p_T": p_T,
             "p_G": p_G,
             "p_S": p_S,

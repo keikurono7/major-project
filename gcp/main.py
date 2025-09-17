@@ -16,12 +16,12 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 
 # Import from our modules
-from syllabus_parser import extract_syllabus_structure
+from syllabus_parser import extract_syllabus_structure, extract_syllabus_structure_from_pdf
 from firebase_ops import (
     create_subject_with_nested_structure, update_topic_content, get_subject_structure,
     get_all_subjects, get_subject_modules, get_module_topics,
 )
-from quiz_generator import generate_topic_quiz, generate_quiz_for_topic
+from quiz_generator import generate_topic_quiz, generate_quiz_for_topic, evaluate_quiz_response
 from assignment_generator import generate_topic_assignment, generate_multi_topic_assignment
 from question_paper_generator import generate_question_paper, save_question_paper
 from auth import User, UserCreate, Token
@@ -66,18 +66,25 @@ class BktParams(BaseModel):
 # Update the create_course_from_syllabus endpoint
 @app.post("/create-course-from-syllabus")
 async def create_course_structure(
-    syllabus_text: str = Form(...),
     title: str = Form("Untitled Course"),
     teacher_id: str = Form("unknown"),
+    file: UploadFile = File(...),  # Now required, not Optional
 ):
     """
-    Create a course structure from syllabus text content.
+    Create a course structure from a PDF syllabus file.
     """
     try:
         print(f"Received request to create course: '{title}' by teacher: {teacher_id}")
         
-        # Extract syllabus structure from text
-        syllabus_structure = extract_syllabus_structure(syllabus_text, title)
+        # Validate file is a PDF
+        if not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+        
+        # Read the contents of the uploaded PDF
+        contents = await file.read()
+        
+        # Extract the syllabus structure from the PDF bytes
+        syllabus_structure = extract_syllabus_structure_from_pdf(contents, title)
         
         # Ensure the name from the syllabus_structure is updated with the provided title
         if syllabus_structure:
@@ -379,7 +386,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         )
     
     return {
-        "user_id": user.id,
+        "id": user.id,
         "email": user.email,
         "full_name": user.full_name,
         "role": user.role
@@ -491,15 +498,16 @@ async def submit_response(
     if topic_id is None or is_correct is None:
         raise HTTPException(status_code=400, detail="Topic ID and response correctness are required")
     
-    updated_params = update_student_topic_response(student_id, topic_id, is_correct)
+    # Use evaluate_quiz_response from quiz_generator instead
+    updated_params = evaluate_quiz_response(student_id, topic_id, is_correct)
     
     if not updated_params:
         raise HTTPException(status_code=500, detail="Failed to update student parameters")
     
     return {
         "updated": True,
-        "mastery_probability": updated_params.get("mastery_probability", 0),
-        "learning_rate": updated_params.get("learning_rate", 0)
+        "mastery_probability": updated_params.get("p_L", 0),
+        "learning_rate": updated_params.get("p_T", 0)
     }
 
 @app.get("/student/{student_id}/bkt/{topic_id}")
@@ -521,10 +529,44 @@ async def get_bkt_params(
     params = get_student_bkt_params(student_id, topic_id)
     
     return {
-        "mastery_probability": params.get("p_L", 0.5),
+        "mastery_probability": params.get("p_L", 0.0),
         "learning_rate": params.get("p_T", 0.1),
         "last_updated": params.get("last_updated", None)
     }
+    
+@app.post("/upload-syllabus")
+async def upload_syllabus(
+    file: UploadFile = File(...),
+    title: str = Form("Untitled Subject"),
+    teacher_id: str = Header(None)
+):
+    """Upload a PDF syllabus and extract its structure"""
+    if not teacher_id:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    if not file.filename.lower().endswith('.pdf'):
+        raise HTTPException(status_code=400, detail="Only PDF files are accepted")
+    
+    try:
+        # Read the contents of the uploaded PDF
+        contents = await file.read()
+        
+        # Extract the syllabus structure from the PDF bytes
+        syllabus_structure = extract_syllabus_structure_from_pdf(contents, title)
+        
+        # Create subject with nested structure in Firebase
+        subject_id = create_subject_with_nested_structure(teacher_id, syllabus_structure)
+        
+        return {
+            "status": "success",
+            "subject_id": subject_id,
+            "structure": syllabus_structure,
+            "modules_created_count": len(syllabus_structure.get("modules", [])),
+            "topics_created_count": sum(len(module.get("topics", [])) for module in syllabus_structure.get("modules", [])),
+            "topics_with_content_count": 0  # Will be updated if content mapping is implemented
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error processing syllabus: {str(e)}")
     
 if __name__ == "__main__":
     import uvicorn

@@ -43,7 +43,69 @@
   </div>
 
 <script>
-    const API_BASE = "http://34.47.166.40:8000";
+    const API_BASE = "http://localhost:8000"; // Update to your API server URL
+
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const submitButton = document.getElementById('submit-button');
+        const statusMessage = document.getElementById('status-message');
+        const resultDiv = document.getElementById('upload-result');
+        
+        const teacherId = document.getElementById('teacher-id').value;
+        const syllabusFile = document.getElementById('syllabus-file').files[0];
+        const textbookFiles = document.getElementById('textbook-files').files;
+        
+        if (!syllabusFile) {
+            statusMessage.textContent = "Please select a syllabus PDF file.";
+            return;
+        }
+        
+        // Disable submit button and show loading message
+        submitButton.disabled = true;
+        statusMessage.textContent = "Uploading syllabus PDF and processing...";
+        resultDiv.style.display = 'none';
+        
+        try {
+            // Create form data for the API request
+            const formData = new FormData();
+            formData.append('file', syllabusFile);
+            formData.append('title', syllabusFile.name.replace('.pdf', ''));
+            
+            // Upload syllabus PDF and extract structure
+            const response = await fetch(`${API_BASE}/upload-syllabus`, {
+                method: 'POST',
+                headers: {
+                    'teacher-id': teacherId
+                },
+                body: formData
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.detail || `Upload failed: ${response.status}`);
+            }
+            
+            const resultData = await response.json();
+            
+            // Display the result
+            displayStructure(resultData);
+            statusMessage.textContent = "✅ Syllabus processed successfully!";
+            
+            // Handle textbook uploads if needed
+            if (textbookFiles.length > 0) {
+                statusMessage.textContent = "✅ Syllabus processed! Now uploading textbooks...";
+                // Add code to handle textbook uploads here
+                // This would be a separate endpoint call
+            }
+            
+        } catch (error) {
+            console.error('Error:', error);
+            statusMessage.textContent = `❌ Error: ${error.message}`;
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
 
     function displayStructure(resultData) {
         const resultDiv = document.getElementById('upload-result');
@@ -94,61 +156,6 @@
                 item.textContent = `${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`;
                 fileListDiv.appendChild(item);
             });
-        }
-    });
-
-    document.getElementById('upload-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const submitButton = document.getElementById('submit-button');
-        const statusMessage = document.getElementById('status-message');
-        const resultDiv = document.getElementById('upload-result');
-        
-        const teacherId = document.getElementById('teacher-id').value;
-        const syllabusFile = document.getElementById('syllabus-file').files[0];
-        const textbookFiles = document.getElementById('textbook-files').files;
-
-        if (!syllabusFile || textbookFiles.length === 0) {
-            statusMessage.textContent = 'Please select both a syllabus and at least one textbook file.';
-            statusMessage.style.color = 'red';
-            return;
-        }
-
-        const formData = new FormData();
-        formData.append('syllabus_file', syllabusFile);
-        Array.from(textbookFiles).forEach(file => formData.append('textbook_files', file));
-        formData.append('request', JSON.stringify({ teacher_id: teacherId }));
-
-        submitButton.disabled = true;
-        submitButton.textContent = 'Processing...';
-        statusMessage.textContent = 'Uploading and processing files. This may take a moment...';
-        statusMessage.style.color = '#0056b3';
-        resultDiv.style.display = 'none';
-
-        try {
-            const response = await fetch(`${API_BASE}/syllabus-textbook-upload`, {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(`Server error: ${response.status} - ${errorData.detail || 'Unknown error'}`);
-            }
-
-            const data = await response.json();
-            displayStructure(data);
-            statusMessage.textContent = 'Processing complete!';
-            statusMessage.style.color = '#28a745';
-
-        } catch (err) {
-            statusMessage.textContent = `Error: ${err.message}`;
-            statusMessage.style.color = 'red';
-            resultDiv.innerHTML = `<pre style="color: red;">${err.message}</pre>`;
-            resultDiv.style.display = 'block';
-        } finally {
-            submitButton.disabled = false;
-            submitButton.textContent = 'Upload and Process';
         }
     });
 </script>

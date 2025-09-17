@@ -37,7 +37,7 @@ def generate_topic_quiz(
 
     if student_id:
         bkt_params = get_student_bkt_params(student_id, topic_key)
-        p_L = bkt_params.get("p_L", 0.5)
+        p_L = bkt_params.get("p_L", 0.0)
         if p_L < 0.3:
             difficulty = "easy"
         elif p_L < 0.7:
@@ -167,34 +167,53 @@ def evaluate_quiz_response(
     topic_id: str,
     is_correct: bool
 ):
-    # Get current parameters
-    bkt_params = get_student_bkt_params(student_id, topic_id)
-    
-    # Create numpy arrays for pyBKT
-    # Format: num_subparts x num_resources x num_students
-    data = {}
-    data["correct"] = np.array([[[1 if is_correct else 0]]])
-    data["opportunity"] = np.array([[[1]]])  # First opportunity
-    
-    # Set up the model with all parameters
-    model = Model()
-    model.fit(data=data, 
-              defaults={
-                 "prior": bkt_params.get("p_L0", 0.5),
-                 "learn": bkt_params.get("p_T", 0.1),
-                 "guess": bkt_params.get("p_G", 0.2),
-                 "slip": bkt_params.get("p_S", 0.1)
-              })
-    
-    # Get updated mastery probability
-    state = model.predict_state(data)
-    p_L_new = float(state["state"][0][0][0])
-    
-    # Update parameters in database
-    bkt_params["p_L"] = p_L_new
-    update_student_bkt_params(student_id, topic_id, bkt_params)
-    
-    return bkt_params
+    """
+    Update student knowledge model based on quiz response using BKT update equations.
+    This version does NOT use the pyBKT library, which is not suited for single updates.
+    """
+    bkt_params = {} # Initialize in case the 'try' block fails early
+    try:
+        # 1. Get current BKT parameters from the database
+        bkt_params = get_student_bkt_params(student_id, topic_id)
+        p_L_prior = bkt_params.get("p_L", 0.0) # Prior knowledge
+        p_G = bkt_params.get("p_G", 0.2)       # Guess probability
+        p_S = bkt_params.get("p_S", 0.1)       # Slip probability
+        p_T = bkt_params.get("p_T", 0.1)       # Learning rate (transition)
+
+        print(f"Retrieved BKT params for {student_id} on {topic_id}: {bkt_params}")
+
+        # 2. Update mastery based on the correctness of the answer
+        if is_correct:
+            # Student answered correctly. They either knew it and didn't slip,
+            # or didn't know it and guessed correctly.
+            p_L_posterior = (p_L_prior * (1 - p_S)) / (p_L_prior * (1 - p_S) + (1 - p_L_prior) * p_G)
+        else:
+            # Student answered incorrectly. They either knew it and slipped,
+            # or didn't know it and didn't guess correctly.
+            p_L_posterior = (p_L_prior * p_S) / (p_L_prior * p_S + (1 - p_L_prior) * (1 - p_G))
+
+        # 3. Apply the learning rate to get the final mastery for the next state
+        # The student has a chance to learn (transition) from the 'not-known' state.
+        p_L_new = p_L_posterior + (1 - p_L_posterior) * p_T
+        
+        print(f"Prior mastery: {p_L_prior:.4f} -> Posterior: {p_L_posterior:.4f} -> New mastery: {p_L_new:.4f}")
+
+        # 4. Update the new mastery level in the database
+        bkt_params["p_L"] = p_L_new
+        update_student_bkt_params(student_id, topic_id, bkt_params)
+        print(f"✅ Updated BKT params saved to database: {bkt_params}")
+
+        return bkt_params
+
+    except Exception as e:
+        import traceback
+        print(f"❌ Error in evaluate_quiz_response: {e}")
+        traceback.print_exc()
+
+        # Return the original parameters to avoid a complete failure
+        return bkt_params if bkt_params else {
+            "p_L": 0.5, "p_L0": 0.5, "p_T": 0.1, "p_G": 0.2, "p_S": 0.1
+        }
 
 
 def generate_quiz_for_topic(student_id: str, topic_id: str, num_questions: int = 5) -> Optional[Dict[str, Any]]:
