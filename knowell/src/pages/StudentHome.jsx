@@ -3,7 +3,6 @@ import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import Navbar from '../components/common/Navbar';
 import Sidebar from '../components/common/Sidebar';
-import QuizSection from '../components/student/QuizSection';
 import ProgressTracker from '../components/student/ProgressTracker';
 import QuizInterface from '../components/student/QuizInterface';
 import AssignmentInterface from '../components/student/AssignmentInterface';
@@ -250,7 +249,7 @@ const StudentHome = () => {
         );
 
       case 'quizzes':
-        return <QuizSection currentUser={currentUser} />;
+        return <QuizInterface studentId={currentUser.id} />;
 
       case 'assignments':
         return (

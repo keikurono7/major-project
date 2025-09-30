@@ -205,7 +205,7 @@ def evaluate_assignment_answer(
         # Extract JSON
         json_match = re.search(r'\{[\s\S]*\}', raw_output)
         if not json_match:
-            return generate_fallback_evaluation(student_answer, question_data)
+            raise ValueError("Failed to extract evaluation JSON")
             
         json_str = json_match.group(0)
         
@@ -214,39 +214,20 @@ def evaluate_assignment_answer(
         
         # Validate the result
         if not all(key in result for key in ["score", "keyword_matches", "keyword_misses", "detected_mistakes"]):
-            return generate_fallback_evaluation(student_answer, question_data)
+            raise ValueError("Invalid evaluation result format")
+        
         
         return result
         
     except Exception as e:
         print(f"❌ Error evaluating answer: {str(e)}")
-        return generate_fallback_evaluation(student_answer, question_data)
-
-
-def generate_fallback_evaluation(student_answer: str, question_data: Dict[str, Any]) -> Dict[str, Any]:
-    """Generate a basic evaluation when the detailed evaluation fails"""
-    # Simple keyword matching for fallback
-    matched_keywords = []
-    missing_keywords = []
-    
-    for concept in question_data.get("key_concepts", []):
-        if concept.lower() in student_answer.lower():
-            matched_keywords.append(concept)
-        else:
-            missing_keywords.append(concept)
-    
-    # Calculate a basic score based on keyword matches
-    score = len(matched_keywords) / max(1, len(question_data.get("key_concepts", [])))
-    score = min(0.7, score)  # Cap at 0.7 since this is a fallback
-    
-    return {
-        "score": score,
-        "keyword_matches": matched_keywords,
-        "keyword_misses": missing_keywords,
-        "detected_mistakes": ["Unable to perform detailed evaluation"],
-        "feedback": "Basic evaluation performed. Try to include more key concepts in your answer."
-    }
-
+        return {
+            "score": 0.0,
+            "keyword_matches": [],
+            "keyword_misses": question_data.get("key_concepts", []),
+            "detected_mistakes": ["Evaluation failed"],
+            "feedback": "An error occurred during evaluation. Please try again."
+        }
 
 def generate_feedback(
     student_answer: str,

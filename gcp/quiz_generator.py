@@ -72,10 +72,14 @@ def generate_topic_quiz(
     try:
         llm = OllamaLLM(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL)
         raw_output = llm.invoke(prompt)
+        
+        # Log the raw output for debugging
+        print(f"Raw LLM Output:\n{raw_output}")
+        
         quiz_questions = parse_quiz_to_json(raw_output)
         if not quiz_questions:
-            print(f"⚠️ Failed to generate quiz for {topic_name}, using backup method")
-            quiz_questions = generate_backup_questions(topic_name)
+            raise ValueError(f"Failed to parse quiz questions for {topic_name}. Raw output:\n{raw_output}")
+        
         print(f"✅ Successfully generated {len(quiz_questions)} questions for {topic_name}")
         return {
             "topic": topic_name,
@@ -92,8 +96,8 @@ def generate_topic_quiz(
             "topic_id": topic_key,
             "subject": subject_name,
             "module": module_name,
-            "questions": generate_backup_questions(topic_name),
-            "question_count": 1,
+            "questions": [],
+            "question_count": 0,
             "error": str(e)
         }
 
@@ -111,6 +115,10 @@ def parse_quiz_to_json(raw_text: str) -> List[Dict[str, Any]]:
         # Try alternative pattern if the first one didn't work
         question_blocks = re.split(r'\d+\.\s', raw_text)[1:]
     
+    if not question_blocks:
+        print("❌ No question blocks found in the raw text.")
+        return []
+    
     for block in question_blocks:
         block = block.strip()
         
@@ -119,13 +127,14 @@ def parse_quiz_to_json(raw_text: str) -> List[Dict[str, Any]]:
         
         # Extract options
         options = []
-        option_matches = re.findall(r'([A-D]\))(.*?)(?=[A-D]\)|Answer:|$)', block, re.DOTALL)
+        option_matches = re.findall(r'([A-D]\))\s*(.*?)(?=\s*[A-D]\)|\s*Answer:|$)', block, re.DOTALL)
         
         for label, text in option_matches:
-            options.append(f"{label} {text.strip()}")
+            options.append(text.strip())
         
         # If we didn't find 4 options, skip this question
         if len(options) != 4:
+            print(f"❌ Skipping question due to insufficient options: {block}")
             continue
         
         # Extract Answer
@@ -143,24 +152,10 @@ def parse_quiz_to_json(raw_text: str) -> List[Dict[str, Any]]:
                 "answer": answer,
                 "explanation": explanation
             })
+        else:
+            print(f"❌ Skipping invalid question block: {block}")
 
     return quizzes
-
-
-def generate_backup_questions(topic_name: str) -> List[Dict[str, Any]]:
-    """Generate a simple backup question if main generation fails"""
-    return [{
-        "question": f"Which of the following best describes {topic_name}?",
-        "options": [
-            "A) A fundamental concept in this subject area",
-            "B) An advanced application of prior theories",
-            "C) A historical development in the field",
-            "D) A specialized technique with limited applications"
-        ],
-        "answer": "A",
-        "explanation": "This is a backup question generated when the primary generation failed."
-    }]
-
 
 def evaluate_quiz_response(
     student_id: str,

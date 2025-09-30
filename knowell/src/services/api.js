@@ -42,8 +42,9 @@ export const modulesApi = {
 };
 
 export const quizApi = {
-  generateQuiz: (data) => api.post('/quiz', data),
+  generateQuiz: (data) => api.post('/generate-quiz', data),
   submitAnswer: (studentId, data) => api.post(`/quiz/${studentId}/submit`, data),
+  submitQuizResponse: (data) => api.post('/submit-quiz-response', data), // New API method
 };
 
 export const assignmentApi = {
