@@ -13,9 +13,10 @@ const api = axios.create({
 // Authentication headers
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+    const user = localStorage.getItem('user');
+    if (user) {
+      const { id } = JSON.parse(user);
+      config.headers['user-id'] = id; 
     }
     return config;
   },
@@ -23,12 +24,21 @@ api.interceptors.request.use(
 );
 
 export const topicsApi = {
-  getAll: () => api.get('/topics'),
+  getByModule: (moduleId, userId) =>
+    api.get(`/modules/${moduleId}/topics`, {
+      headers: { 'user-id': userId },
+    }),
 };
 
 export const progressApi = {
-  getProgress: (studentId) => api.get(`/progress/${studentId}`),
-  resetProgress: (studentId) => api.post(`/progress/${studentId}/reset`),
+  getProgress: (studentId) => api.get(`/student/${studentId}/progress`),
+  getBKTParams: (studentId, topicId) =>
+    api.get(`/student/${studentId}/bkt/${topicId}`), 
+};
+
+export const modulesApi = {
+  getAll: () => api.get('/subjects'),
+  getBySubject: (subjectId) => api.get(`/subjects/${subjectId}/modules`),
 };
 
 export const quizApi = {

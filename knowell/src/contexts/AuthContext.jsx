@@ -8,12 +8,17 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user data on app load
     const storedUser = localStorage.getItem('user');
+    console.log("Stored User:", storedUser);
     if (storedUser) {
-      setCurrentUser(JSON.parse(storedUser));
+      const parsedUser = JSON.parse(storedUser);
+      setCurrentUser(parsedUser);
+      console.log("AuthContext initialized, currentUser:", parsedUser);
+    } else {
+      console.log("No stored user found");
     }
     setLoading(false);
+    console.log("AuthContext loading state set to false");
   }, []);
 
   const login = (user) => {

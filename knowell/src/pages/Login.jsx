@@ -17,7 +17,7 @@ const Login = () => {
     
     try {
       const user = {
-        id: isStudent ? 'student123' : 'teacher456',
+        id: credentials.username,
         username: credentials.username,
         role: isStudent ? 'student' : 'teacher',
         fullName: isStudent ? 'John Doe' : 'Dr. Smith',

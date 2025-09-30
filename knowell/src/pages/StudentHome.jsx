@@ -3,50 +3,96 @@ import React, { useContext, useState, useEffect } from 'react';
 import { AuthContext } from '../contexts/AuthContext';
 import Navbar from '../components/common/Navbar';
 import Sidebar from '../components/common/Sidebar';
+import QuizSection from '../components/student/QuizSection';
 import ProgressTracker from '../components/student/ProgressTracker';
 import QuizInterface from '../components/student/QuizInterface';
 import AssignmentInterface from '../components/student/AssignmentInterface';
-import { topicsApi, progressApi } from '../services/api';
+import { topicsApi, progressApi, modulesApi } from '../services/api';
 import '../dashboard.css';
 
 const StudentHome = () => {
-  const { currentUser } = useContext(AuthContext);
-  const [topics, setTopics] = useState([
-    { id: 1, name: "Machine Learning", confidence: 0.85 },
-    { id: 2, name: "Data Structures", confidence: 0.72 },
-    { id: 3, name: "Algorithms", confidence: 0.68 },
-    { id: 4, name: "Database Systems", confidence: 0.91 },
-    { id: 5, name: "Web Development", confidence: 0.79 },
-    { id: 6, name: "AI Fundamentals", confidence: 0.63 }
-  ]);
+  const { currentUser, loading: authLoading } = useContext(AuthContext); // Use loading from AuthContext
+  const [topics, setTopics] = useState([]);
   const [progress, setProgress] = useState({
-    confidence_scores: {
-      "Machine Learning": 0.85,
-      "Data Structures": 0.72,
-      "Algorithms": 0.68,
-      "Database Systems": 0.91,
-      "Web Development": 0.79,
-      "AI Fundamentals": 0.63
-    }
+    confidence_scores: {}
   });
   const [activeTab, setActiveTab] = useState('dashboard');
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchTopicsAndBKT = async () => {
       try {
-        // Simulate API calls
-        setTimeout(() => {
-          setLoading(false);
-        }, 500);
+        // Ensure currentUser is valid
+        if (!currentUser || !currentUser.id) {
+          console.error("Invalid user data");
+          return;
+        }
+
+        // Step 1: Get all subjects
+        const subjectsRes = await modulesApi.getAll();
+        console.log("Subjects Response:", subjectsRes.data);
+        const subjects = subjectsRes.data.subjects; // Access the subjects array
+        if (!subjects || subjects.length === 0) {
+          console.error("No subjects found");
+          return;
+        }
+
+        // Loop through all subjects
+        for (const subject of subjects) {
+          console.log("Processing Subject:", subject);
+
+          // Step 2: Get all modules for the current subject
+          const modulesRes = await modulesApi.getBySubject(subject.id);
+          const modules = modulesRes.data.modules; // Access the modules array
+          if (!modules || modules.length === 0) {
+            console.error(`No modules found for subject ${subject.name}`);
+            continue;
+          }
+
+          // Loop through all modules
+          for (const module of modules) {
+            console.log("Processing Module:", module);
+
+            // Step 3: Get all topics for the current module
+            const topicsRes = await topicsApi.getByModule(module.id, currentUser.id);
+            if (!topicsRes.data || !topicsRes.data.topics) {
+              console.error(`No topics found for module ${module.name}`);
+              continue;
+            }
+
+            // Fetch BKT parameters for each topic
+            const topicsWithBKT = await Promise.all(
+              topicsRes.data.topics.map(async (topic) => {
+                try {
+                  const bktRes = await progressApi.getBKTParams(currentUser.id, topic.id);
+                  return {
+                    ...topic,
+                    bkt_score: bktRes.data.mastery_probability || 0, // Use mastery_probability from BKT API
+                  };
+                } catch (error) {
+                  console.warn(`Failed to fetch BKT params for topic ${topic.name}:`, error);
+                  return {
+                    ...topic,
+                    bkt_score: 0, // Default BKT score if API call fails
+                  };
+                }
+              })
+            );
+
+            // Add topics with BKT scores to the state
+            setTopics((prevTopics) => [...prevTopics, ...topicsWithBKT]);
+          }
+        }
       } catch (error) {
-        console.error('Error fetching data:', error);
-        setLoading(false);
+        console.error("Error fetching topics and BKT scores:", error);
       }
     };
-    
-    fetchData();
-  }, [currentUser.id]);
+
+    // Only fetch topics and BKT scores when AuthContext is done loading and currentUser is valid
+    if (!authLoading && currentUser) {
+      fetchTopicsAndBKT();
+    }
+  }, [currentUser, authLoading]);
+
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -64,16 +110,17 @@ const StudentHome = () => {
   ];
 
   const renderContent = () => {
-    if (loading) return <div className="loading">Loading...</div>;
+    if (authLoading) return <div className="loading">Loading...</div>;
     
     switch (activeTab) {
       case 'dashboard':
-        const avgConfidence = progress ? 
-          (Object.values(progress.confidence_scores).reduce((a, b) => a + b, 0) / 
-          Object.values(progress.confidence_scores).length * 100).toFixed(0) : 0;
-        
-        const focusArea = progress ? 
-          Object.entries(progress.confidence_scores).sort((a, b) => a[1] - b[1])[0][0] : 'N/A';
+        const avgBKT = topics.length > 0
+        ? (topics.reduce((sum, topic) => sum + topic.bkt_score, 0) / topics.length * 100).toFixed(0)
+        : 0;
+
+      const focusArea = topics.length > 0
+        ? topics.sort((a, b) => a.bkt_score - b.bkt_score)[0].name
+        : 'N/A';
 
         return (
           <>
@@ -97,7 +144,7 @@ const StudentHome = () => {
               <div className="stat-card">
                 <div className="stat-icon">🎯</div>
                 <div className="stat-info">
-                  <div className="stat-value">{avgConfidence}%</div>
+                  <div className="stat-value">{avgBKT}%</div>
                   <div className="stat-label">Average Confidence</div>
                   <div className="stat-desc">Across all topics</div>
                 </div>
@@ -128,19 +175,19 @@ const StudentHome = () => {
               <div className="card">
                 <h3 className="mb-4">Your Progress</h3>
                 <div className="progress-overview">
-                  {Object.entries(progress.confidence_scores).map(([topic, confidence]) => (
-                    <div key={topic} className="progress-item">
-                      <div className="progress-header">
-                        <span className="progress-topic">{topic}</span>
-                        <span className="progress-score">{Math.round(confidence * 100)}%</span>
-                      </div>
-                      <div className="progress-bar">
-                        <div 
-                          className="progress-fill" 
-                          style={{ 
-                            width: `${confidence * 100}%`,
-                            backgroundColor: confidence > 0.8 ? '#10b981' : confidence > 0.6 ? '#f59e0b' : '#ef4444'
-                          }}
+                  {topics.filter(topic => topic.bkt_score > 0).map((topic) => (
+                  <div key={topic.id} className="progress-item">
+                    <div className="progress-header">
+                      <span className="progress-topic">{topic.name}</span>
+                      <span className="progress-score">{Math.round(topic.bkt_score * 100)}%</span>
+                    </div>
+                    <div className="progress-bar">
+                      <div 
+                        className="progress-fill" 
+                        style={{ 
+                          width: `${topic.bkt_score * 100}%`,
+                          backgroundColor: topic.bkt_score > 0.8 ? '#10b981' : topic.bkt_score > 0.6 ? '#f59e0b' : '#ef4444'
+                        }}
                         ></div>
                       </div>
                     </div>
@@ -203,28 +250,7 @@ const StudentHome = () => {
         );
 
       case 'quizzes':
-        return (
-          <div className="card">
-            <h2>Available Quizzes</h2>
-            <div className="quiz-grid">
-              {topics.map((topic, idx) => (
-                <div key={idx} className="quiz-card">
-                  <div className="quiz-header">
-                    <h3>{topic.name}</h3>
-                    <div className={`confidence-badge ${
-                      topic.confidence > 0.8 ? 'confidence-high' : 
-                      topic.confidence > 0.6 ? 'confidence-medium' : 'confidence-low'
-                    }`}>
-                      {Math.round(topic.confidence * 100)}%
-                    </div>
-                  </div>
-                  <p>Test your knowledge in {topic.name.toLowerCase()}</p>
-                  <button className="btn btn-primary">Start Quiz</button>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
+        return <QuizSection currentUser={currentUser} />;
 
       case 'assignments':
         return (
