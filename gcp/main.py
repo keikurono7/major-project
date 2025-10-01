@@ -1,30 +1,26 @@
 # main.py
 
 import os
-import uuid
-import json
-import shutil
 from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Add this import
 from fastapi import FastAPI, HTTPException, File, UploadFile, Form, BackgroundTasks, Depends, status, Header, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from jose import JWTError, jwt
+from fastapi.security import OAuth2PasswordRequestForm
 
 # Import from our modules
-from syllabus_parser import extract_syllabus_structure, extract_syllabus_structure_from_pdf
+from syllabus_parser import extract_syllabus_structure_from_pdf
 from firebase_ops import (
     create_subject_with_nested_structure, update_topic_content, get_subject_structure,
     get_all_subjects, get_subject_modules, get_module_topics,
 )
 from quiz_generator import generate_topic_quiz, generate_quiz_for_topic, evaluate_quiz_response
-from assignment_generator import generate_topic_assignment, generate_multi_topic_assignment
+from assignment_generator import generate_topic_assignment
 from question_paper_generator import generate_question_paper, save_question_paper
-from auth import User, UserCreate, Token
+from auth import User, UserCreate
 from auth import authenticate_user, create_firebase_user
 
 # --- App Initialization ---
@@ -192,40 +188,15 @@ async def generate_single_topic_quiz(
 
 
 @app.post("/generate-topic-assignment")
-async def generate_single_topic_assignment(
-    subject_name: str,
-    module_name: str,
-    topic_name: str,
-    num_questions: int = 3,
+async def generate_topic_assignment_endpoint(
+    subject_id: str,
+    topics: List[str],
+    num_questions: int = 5,
     student_id: Optional[str] = None
 ):
     """
-    Endpoint to generate an assignment for a single topic,
+    Endpoint to generate an assignment for one or multiple topics,
     with difficulty adjusted based on student mastery level.
-    """
-    try:
-        assignment = generate_topic_assignment(
-            subject_name=subject_name,
-            module_name=module_name,
-            topic_name=topic_name,
-            num_questions=num_questions,
-            student_id=student_id
-        )
-        return assignment
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Assignment generation failed: {str(e)}")
-
-
-@app.post("/generate-multi-topic-assignment")
-async def generate_multi_topics_assignment(
-    subject_id: str,
-    student_id: str = None,
-    num_topics: int = 3,
-    num_questions_per_topic: int = 2
-):
-    """
-    Generates an assignment covering multiple topics, focusing on the student's 
-    weakest areas if a student_id is provided.
     """
     try:
         # Get the course structure from Firebase
@@ -234,19 +205,15 @@ async def generate_multi_topics_assignment(
         if not subject_data:
             raise HTTPException(status_code=404, detail=f"Subject with ID {subject_id} not found")
         
-        # Generate the multi-topic assignment
-        assignment = generate_multi_topic_assignment(
+        # Generate the assignment
+        assignment = generate_topic_assignment(
             subject_data=subject_data,
-            student_id=student_id,
-            num_topics=num_topics,
-            num_questions_per_topic=num_questions_per_topic
+            topics=topics,
+            num_questions=num_questions,
+            student_id=student_id
         )
-        
         return assignment
-        
     except Exception as e:
-        import traceback
-        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Assignment generation failed: {str(e)}")
 
 

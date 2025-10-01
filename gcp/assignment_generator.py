@@ -16,47 +16,79 @@ OLLAMA_MODEL = "phi3:mini"  # Use a lightweight model for assignment generation
 EMBEDDING_MODEL = "nomic-embed-text"
 OLLAMA_BASE_URL = "http://localhost:11434"  # Update to your Ollama server
 
+
+
 def generate_topic_assignment(
-    subject_name: str,
-    module_name: str,
-    topic_name: str,
-    num_questions: int = 3,
-    student_id: Optional[str] = None,
-    bkt_params: Optional[dict] = None
+    subject_data: Dict[str, Any],
+    topics: List[str], 
+    num_questions: int = 5,
+    student_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Generate an assignment for a specific topic, using BKT params if provided.
+    Generate an assignment for one or multiple topics with a specified total question count.
+    
+    Args:
+        subject_data: The complete subject structure from Firebase
+        topics: List of topic names to include in the assignment
+        num_questions: Total number of questions to generate across all topics combined
+        student_id: Optional student ID to personalize difficulty
+    
+    Returns:
+        Dictionary containing the assignment data
     """
-    # Use bkt_params to adjust difficulty or focus
-    difficulty = "medium"
-    if bkt_params:
-        p_L = bkt_params.get("mastery_probability", 0.0)
-        if p_L < 0.3:
-            difficulty = "basic"
-        elif p_L < 0.7:
-            difficulty = "intermediate"
-        else:
-            difficulty = "advanced"
-        
-        print(f"Student mastery level: {p_L:.2f}, setting assignment difficulty to: {difficulty}")
+    subject_name = subject_data["name"]
     
-    print(f"Generating assignment for topic: {topic_name} in {module_name} ({subject_name})")
+    # Get module names for each topic and collect BKT params if available
+    topics_info = []
+    for module in subject_data["modules"]:
+        module_name = module["name"]
+        for topic in module["topics"]:
+            if topic["name"] in topics:
+                # Get BKT params for this student-topic pair if student_id provided
+                difficulty = "medium"
+                if student_id:
+                    topic_key = f"{subject_name}-{module_name}-{topic['name']}".replace(" ", "_").lower()
+                    bkt_params = get_student_bkt_params(student_id, topic_key)
+                    p_L = bkt_params.get("p_L", 0.0)
+                    if p_L < 0.3:
+                        difficulty = "basic"
+                    elif p_L < 0.7:
+                        difficulty = "medium"
+                    else:
+                        difficulty = "advanced"
+                    print(f"Topic: {topic['name']} - Mastery level: {p_L:.2f}, difficulty: {difficulty}")
+                
+                topics_info.append({
+                    "name": topic["name"],
+                    "module_name": module_name,
+                    "difficulty": difficulty
+                })
     
-    # Create the prompt
-    context = f"Subject: {subject_name}\nModule: {module_name}\nTopic: {topic_name}"
+    if not topics_info:
+        raise ValueError("No valid topics found in the provided list.")
+    
+    # Create a consolidated prompt for all topics
+    topics_context = "\n".join([
+        f"Topic: {t['name']} (from {t['module_name']}) - Difficulty: {t['difficulty']}"
+        for t in topics_info
+    ])
     
     prompt = f"""
     Based on the following academic context:
-    {context}
+    Subject: {subject_name}
+    {topics_context}
     
-    Create exactly {num_questions} open-ended questions about "{topic_name}" at {difficulty} difficulty level.
+    Create exactly {num_questions} open-ended questions distributed across the topics listed above.
+    For topics with lower difficulty levels, make questions easier.
+    For topics with higher difficulty levels, make questions more challenging.
     
     For each question:
-    1. Create a clear, specific question that tests understanding of {topic_name}
+    1. Create a clear, specific question that tests understanding of the associated topic
     2. Provide a detailed model answer that would be considered excellent
     3. List 5-8 key concepts that should be present in a good answer
     4. Include 2-3 common misconceptions students might have
-    5. Specify the difficulty level (easy, medium, or hard)
+    5. Specify which topic this question belongs to
+    6. Specify the difficulty level (easy, medium, or hard)
     
     Format as valid JSON:
     [
@@ -65,13 +97,15 @@ def generate_topic_assignment(
         "model_answer": "Comprehensive model answer here...",
         "key_concepts": ["Concept 1", "Concept 2", "Concept 3", "Concept 4", "Concept 5"],
         "common_misconceptions": ["Misconception 1", "Misconception 2"],
-        "difficulty": "{difficulty}"
+        "difficulty": "easy|medium|hard",
+        "topic": "Topic name here"
       }}
     ]
     
+    Ensure you create a total of exactly {num_questions} questions distributed reasonably across all topics.
     Only return the JSON format, nothing else.
     """
-
+    
     try:
         # Call the model
         llm = OllamaLLM(model=OLLAMA_MODEL, base_url=OLLAMA_BASE_URL)
@@ -81,18 +115,22 @@ def generate_topic_assignment(
         assignment_questions = parse_assignment_to_json(raw_output)
         
         if not assignment_questions or len(assignment_questions) == 0:
-            print(f"⚠️ Failed to generate assignment for {topic_name}, using backup method")
-            # Fallback to simpler generation
-            assignment_questions = generate_backup_questions(topic_name, difficulty)
+            print(f"⚠️ Failed to generate assignment questions")
+            raise ValueError("Failed to generate valid assignment questions. Please try again.")
         
-        # Add topic to each question
+        # Add module info to each question
         for question in assignment_questions:
-            question["topic"] = topic_name
-        
-        print(f"✅ Successfully generated {len(assignment_questions)} questions for {topic_name}")
+            topic_name = question.get("topic", topics_info[0]["name"])  # Default to first topic if missing
+            # Find the corresponding module
+            module_name = next((t["module_name"] for t in topics_info if t["name"] == topic_name), 
+                            topics_info[0]["module_name"])  # Default to first module if not found
+            question["module"] = module_name
+            
+        print(f"✅ Generated {len(assignment_questions)} questions across {len(topics_info)} topics")
         
         return {
-            "topic": topic_name,
+            "title": f"{subject_name} - Assignment",
+            "topics_covered": [t["name"] for t in topics_info],
             "questions": assignment_questions,
             "question_count": len(assignment_questions)
         }
@@ -101,12 +139,12 @@ def generate_topic_assignment(
         print(f"❌ Error generating assignment: {str(e)}")
         # Return empty assignment with error message
         return {
-            "topic": topic_name,
-            "questions": generate_backup_questions(topic_name, difficulty),
-            "question_count": 1,
+            "title": f"{subject_name} - Assignment",
+            "topics_covered": [t["name"] for t in topics_info],
+            "questions": [],
+            "question_count": 0,
             "error": str(e)
         }
-
 
 def parse_assignment_to_json(raw_text: str) -> List[Dict[str, Any]]:
     """
@@ -133,19 +171,6 @@ def parse_assignment_to_json(raw_text: str) -> List[Dict[str, Any]]:
         return validated_questions
     except json.JSONDecodeError:
         return []
-
-
-def generate_backup_questions(topic_name: str, difficulty: str = "medium") -> List[Dict[str, Any]]:
-    """Generate a simple backup question if main generation fails"""
-    return [{
-        "question": f"Explain the key concepts of {topic_name} and discuss its importance in the field.",
-        "model_answer": f"{topic_name} encompasses several important principles and methodologies. A comprehensive understanding includes recognizing its foundational elements and practical applications.",
-        "key_concepts": ["Definition", "Core principles", "Applications", "Historical context", "Recent developments"],
-        "common_misconceptions": ["Oversimplification", "Confusion with related concepts"],
-        "difficulty": difficulty,
-        "topic": topic_name
-    }]
-
 
 def evaluate_assignment_answer(
     student_answer: str, 

@@ -252,35 +252,7 @@ const StudentHome = () => {
         return <QuizInterface studentId={currentUser.id} />;
 
       case 'assignments':
-        return (
-          <div className="card">
-            <h2>Your Assignments</h2>
-            <div className="assignment-list">
-              {recentActivity.filter(item => item.type === 'assignment').map((assignment, idx) => (
-                <div key={idx} className="assignment-card">
-                  <div className="assignment-header">
-                    <h3>{assignment.title}</h3>
-                    <span className={`assignment-score ${
-                      assignment.score >= 85 ? 'score-excellent' : 
-                      assignment.score >= 70 ? 'score-good' : 'score-needs-work'
-                    }`}>
-                      {assignment.score}%
-                    </span>
-                  </div>
-                  <div className="assignment-meta">
-                    <span>Submitted {assignment.time}</span>
-                    <span className={`status-badge ${
-                      assignment.score >= 85 ? 'status-excellent' : 
-                      assignment.score >= 70 ? 'status-good' : 'status-needs-improvement'
-                    }`}>
-                      {assignment.score >= 85 ? 'Excellent' : assignment.score >= 70 ? 'Good' : 'Needs Improvement'}
-                    </span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
+        return <AssignmentInterface studentId={currentUser.id} />;
 
       case 'papers':
         return (

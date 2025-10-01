@@ -1,44 +1,99 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { AuthContext } from '../../contexts/AuthContext';
-import { assignmentApi, topicsApi } from '../../services/api';
+import { assignmentApi, topicsApi, modulesApi } from '../../services/api';
 import ParallaxSection from '../common/ParallaxSection';
 import Card from '../common/Card';
 import Button from '../common/Button';
 
 const AssignmentInterface = () => {
   const { currentUser } = useContext(AuthContext);
+  // State for selection flow
+  const [subjects, setSubjects] = useState([]);
+  const [modules, setModules] = useState([]);
   const [topics, setTopics] = useState([]);
-  const [selectedTopic, setSelectedTopic] = useState(null);
+  const [selectedSubject, setSelectedSubject] = useState(null);
+  const [selectedModule, setSelectedModule] = useState(null);
+  const [selectedTopics, setSelectedTopics] = useState([]);
+  
+  // State for assignments
   const [assignment, setAssignment] = useState(null);
   const [answers, setAnswers] = useState({});
   const [feedback, setFeedback] = useState({});
-  const [isMultiTopic, setIsMultiTopic] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState(0);
+  const [numQuestions, setNumQuestions] = useState(5);
 
-  // Fetch available topics
+  // Fetch subjects on component mount
   useEffect(() => {
-    const fetchTopics = async () => {
+    const fetchSubjects = async () => {
       try {
-        const response = await topicsApi.getAll();
-        setTopics(response.data);
+        const response = await modulesApi.getAll();
+        setSubjects(response.data.subjects || []);
       } catch (error) {
-        console.error('Error fetching topics:', error);
+        console.error('Error fetching subjects:', error);
       }
     };
 
-    fetchTopics();
+    fetchSubjects();
   }, []);
 
+  // Fetch modules when subject is selected
+  const fetchModules = async (subjectId) => {
+    try {
+      const response = await modulesApi.getBySubject(subjectId);
+      setModules(response.data.modules || []);
+    } catch (error) {
+      console.error('Error fetching modules:', error);
+    }
+  };
+
+  // Fetch topics when module is selected
+  const fetchTopics = async (moduleId) => {
+    try {
+      const response = await topicsApi.getByModule(moduleId, currentUser.id);
+      setTopics(response.data.topics || []);
+    } catch (error) {
+      console.error('Error fetching topics:', error);
+    }
+  };
+
+  // Handle topic selection/deselection - always handle as multi-select
+  const handleTopicSelect = (topic) => {
+    if (selectedTopics.includes(topic.name)) {
+      setSelectedTopics(selectedTopics.filter(name => name !== topic.name));
+    } else {
+      setSelectedTopics([...selectedTopics, topic.name]);
+    }
+  };
+
+  // Go back in the selection flow
+  const goBack = () => {
+    if (selectedTopics.length > 0) {
+      setSelectedTopics([]);
+    } else if (selectedModule) {
+      setSelectedModule(null);
+      setTopics([]);
+    } else if (selectedSubject) {
+      setSelectedSubject(null);
+      setModules([]);
+    }
+  };
+
+  // Generate assignment with selected topics
   const generateAssignment = async () => {
+    if (selectedTopics.length === 0) {
+      alert('Please select at least one topic');
+      return;
+    }
+
     setIsLoading(true);
     try {
       const response = await assignmentApi.generateAssignment({
-        student_id: currentUser.id,
-        topic: selectedTopic,
-        use_weakest: !selectedTopic,
-        multi_topic: isMultiTopic
+        subject_id: selectedSubject,
+        topics: selectedTopics,
+        num_questions: numQuestions,
+        student_id: currentUser.id
       });
       
       setAssignment(response.data.questions);
@@ -49,6 +104,16 @@ const AssignmentInterface = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Reset assignment and selection
+  const resetAssignment = () => {
+    setAssignment(null);
+    setSelectedSubject(null);
+    setSelectedModule(null);
+    setSelectedTopics([]);
+    setAnswers({});
+    setFeedback({});
   };
 
   const handleAnswerChange = (questionIndex, value) => {
@@ -93,7 +158,7 @@ const AssignmentInterface = () => {
     }
   };
 
-  // Assignment generation form
+  // Assignment generation form with tile-based selection
   if (!assignment) {
     return (
       <div className="assignment-interface">
@@ -102,60 +167,114 @@ const AssignmentInterface = () => {
           <p>Complete assignments to deepen your understanding of key concepts</p>
         </ParallaxSection>
         
-        <Card title="Generate New Assignment">
+        <Card>
+          <h2>Create Assignment</h2>
+          <p className="mb-4">Select topics and generate questions to practice</p>
+          
           <div className="mb-4">
-            <label className="block mb-1 font-medium">Assignment Type:</label>
-            <div className="flex space-x-4">
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={!isMultiTopic}
-                  onChange={() => setIsMultiTopic(false)}
-                  className="mr-2"
-                />
-                Single Topic
-              </label>
-              <label className="flex items-center">
-                <input
-                  type="radio"
-                  checked={isMultiTopic}
-                  onChange={() => setIsMultiTopic(true)}
-                  className="mr-2"
-                />
-                Multiple Topics (Covers your weakest areas)
-              </label>
-            </div>
+            <label className="block mb-1 font-medium">Number of Questions:</label>
+            <input
+              type="number"
+              min="1"
+              max="10"
+              value={numQuestions}
+              onChange={(e) => setNumQuestions(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+              className="w-24 p-2 border border-gray-300"
+            />
           </div>
-          
-          {!isMultiTopic && (
-            <div className="mb-4">
-              <label className="block mb-1 font-medium">Select Topic:</label>
-              <select
-                value={selectedTopic || ''}
-                onChange={e => setSelectedTopic(e.target.value || null)}
-                className="w-full p-2 border border-gray-300"
-              >
-                <option value="">Use my weakest topic</option>
-                {topics.map(topic => (
-                  <option key={topic} value={topic}>{topic}</option>
-                ))}
-              </select>
-            </div>
-          )}
-          
-          <Button
-            onClick={generateAssignment}
-            disabled={isLoading}
-            fullWidth
-          >
-            {isLoading ? 'Generating...' : 'Generate Assignment'}
-          </Button>
+
+          <div className="tile-container">
+            {!selectedSubject && (
+              <>
+                <h3>Select a Subject:</h3>
+                <div className="tiles">
+                  {subjects.map((subject) => (
+                    <div
+                      key={subject.id}
+                      className="tile"
+                      onClick={() => {
+                        setSelectedSubject(subject.id);
+                        fetchModules(subject.id);
+                      }}
+                    >
+                      {subject.name}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {selectedSubject && !selectedModule && (
+              <>
+                <h3>Select a Module:</h3>
+                <div className="tiles">
+                  {modules.map((module) => (
+                    <div
+                      key={module.id}
+                      className="tile"
+                      onClick={() => {
+                        setSelectedModule(module.id);
+                        fetchTopics(module.id);
+                      }}
+                    >
+                      {module.name}
+                    </div>
+                  ))}
+                </div>
+                <button onClick={goBack} className="btn btn-secondary">
+                  Back
+                </button>
+              </>
+            )}
+
+            {selectedModule && (
+              <>
+                <h3>Select Topics:</h3>
+                <div className="tiles">
+                  {topics.map((topic) => (
+                    <div
+                      key={topic.id}
+                      className={`tile ${selectedTopics.includes(topic.name) ? 'selected' : ''}`}
+                      onClick={() => handleTopicSelect(topic)}
+                    >
+                      {selectedTopics.includes(topic.name) && (
+                        <span className="checkmark">✓</span>
+                      )}
+                      {topic.name}
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4">
+                  <button onClick={generateAssignment} className="btn btn-primary" disabled={selectedTopics.length === 0}>
+                    Generate Assignment
+                  </button>
+                  <button onClick={goBack} className="btn btn-secondary ml-2">
+                    Back
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </Card>
       </div>
     );
   }
 
-  // Assignment display
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="card">
+        <div className="text-center">
+          <p>Generating your assignment...</p>
+          <div className="mt-4">
+            <div className="loader"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Assignment display (existing code)
   const currentQuestion = assignment[activeQuestion];
   const hasFeedback = feedback[activeQuestion];
 
@@ -239,12 +358,18 @@ const AssignmentInterface = () => {
             Previous
           </Button>
           
-          <Button 
-            onClick={handleNext}
-            disabled={activeQuestion === assignment.length - 1}
-          >
-            Next Question
-          </Button>
+          {activeQuestion === assignment.length - 1 ? (
+            <Button onClick={resetAssignment} type="secondary">
+              Finish Assignment
+            </Button>
+          ) : (
+            <Button 
+              onClick={handleNext}
+              disabled={activeQuestion === assignment.length - 1}
+            >
+              Next Question
+            </Button>
+          )}
         </div>
       </Card>
     </div>

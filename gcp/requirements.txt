@@ -8,6 +8,5 @@ firebase-admin
 pymupdf==1.23.7
 nltk
 pyBKT>=1.4
-python-jose[cryptography]
 passlib[bcrypt]
 pydantic[email]
