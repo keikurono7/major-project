@@ -3,7 +3,7 @@
 import os
 
 # Firebase Configuration
-SERVICE_ACCOUNT_FILE = 'serviceAccountKey.json'
+SERVICE_ACCOUNT_FILE = './gcp/serviceAccountKey.json'
 
 # Ollama Configuration
 OLLAMA_BASE_URL = "http://ollama:11434"
