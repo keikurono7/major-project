@@ -5,7 +5,6 @@ import numpy as np
 from typing import List, Dict, Any, Optional
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
 from firebase_ops import get_all_subjects, get_subject_modules, get_module_topics, get_student_bkt_params, update_student_bkt_params
-from pyBKT.models import Model
 
 # Initialize NLTK for sentence tokenization
 try:
