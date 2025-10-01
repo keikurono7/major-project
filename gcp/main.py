@@ -18,7 +18,7 @@ from firebase_ops import (
     get_all_subjects, get_subject_modules, get_module_topics,
 )
 from quiz_generator import generate_topic_quiz, generate_quiz_for_topic, evaluate_quiz_response
-from assignment_generator import generate_topic_assignment
+from assignment_generator import generate_topic_assignment, evaluate_assignment_answer, generate_feedback
 from question_paper_generator import generate_question_paper, save_question_paper
 from auth import User, UserCreate
 from auth import authenticate_user, create_firebase_user
@@ -187,31 +187,33 @@ async def generate_single_topic_quiz(
         raise HTTPException(status_code=500, detail=f"Quiz generation failed: {str(e)}")
 
 
-@app.post("/generate-topic-assignment")
-async def generate_topic_assignment_endpoint(
-    subject_id: str,
-    topics: List[str],
-    num_questions: int = 5,
+from pydantic import BaseModel
+from typing import List, Optional
+
+# Create a Pydantic model for the request
+class AssignmentRequest(BaseModel):
+    subject_id: str
+    topic_ids: List[str]
+    num_questions: int = 5
     student_id: Optional[str] = None
-):
+
+@app.post("/generate-topic-assignment")
+async def generate_topic_assignment_endpoint(request: AssignmentRequest):
     """
-    Endpoint to generate an assignment for one or multiple topics,
-    with difficulty adjusted based on student mastery level.
+    Endpoint to generate an assignment for one or multiple topics using Firebase topic IDs.
+    Distributes the specified number of questions across all selected topics.
     """
     try:
-        # Get the course structure from Firebase
-        subject_data = get_subject_structure(subject_id)
-        
-        if not subject_data:
-            raise HTTPException(status_code=404, detail=f"Subject with ID {subject_id} not found")
-        
-        # Generate the assignment
+        # Call the new function to handle topic ID resolution and assignment generation
         assignment = generate_topic_assignment(
-            subject_data=subject_data,
-            topics=topics,
-            num_questions=num_questions,
-            student_id=student_id
+            student_id=request.student_id,
+            topic_ids=request.topic_ids,
+            num_questions=request.num_questions
         )
+        
+        if not assignment:
+            raise HTTPException(status_code=404, detail="Failed to generate assignment: Topics not found")
+            
         return assignment
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Assignment generation failed: {str(e)}")
@@ -593,7 +595,42 @@ async def generate_multi_topic_assignment_bkt(
         "questions": questions
     }
 
-
+@app.post("/evaluate-assignment-answer")
+async def evaluate_assignment_answer_endpoint(data: dict):
+    """
+    Evaluate a student's answer to an assignment question
+    """
+    try:
+        student_id = data.get("student_id")
+        question_data = data.get("question_data")
+        answer = data.get("answer")
+        
+        if not all([student_id, question_data, answer]):
+            raise HTTPException(status_code=400, detail="Missing required data")
+        
+        evaluation = evaluate_assignment_answer(answer, question_data)
+        
+        # Generate detailed feedback
+        feedback_text = generate_feedback(
+            student_answer=answer,
+            model_answer=question_data["model_answer"],
+            keyword_matches=evaluation.get("keyword_matches", []),
+            keyword_misses=evaluation.get("keyword_misses", []),
+            detected_mistakes=evaluation.get("detected_mistakes", []),
+            score=evaluation.get("score", 0.0)
+        )
+        
+        # Add feedback to the evaluation
+        evaluation["feedback"] = feedback_text
+        
+        # If student_id and topic_id are provided, we could update BKT params here
+        # (similar to how quiz responses update them)
+        
+        return evaluation
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Evaluation failed: {str(e)}")
+    
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)

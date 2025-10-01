@@ -48,9 +48,14 @@ export const quizApi = {
 };
 
 export const assignmentApi = {
-  generateAssignment: (data) => api.post('/generate-topic-assignment', data),
-  evaluateAnswer: (studentId, questionId, answer) => 
-    api.post(`/assignment/${studentId}/evaluate?question_id=${questionId}`, { answer }),
+  generateAssignment: (data) => api.post('/generate-topic-assignment', {
+    subject_id: data.subject_id,
+    topic_ids: data.topic_ids,  // Changed from topics to topic_ids
+    num_questions: data.num_questions,
+    student_id: data.student_id
+  }),
+  evaluateAnswer: (data) => 
+    api.post('/evaluate-assignment-answer', data),
 };
 
 export const paperApi = {

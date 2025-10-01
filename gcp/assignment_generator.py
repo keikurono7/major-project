@@ -3,7 +3,7 @@ import re
 import nltk
 from typing import List, Dict, Any, Optional
 from langchain_ollama import OllamaEmbeddings, OllamaLLM
-from firebase_ops import get_student_bkt_params
+from firebase_ops import get_student_bkt_params, get_all_subjects, get_subject_modules, get_module_topics
 
 # Initialize NLTK for sentence tokenization
 try:
@@ -17,78 +17,60 @@ EMBEDDING_MODEL = "nomic-embed-text"
 OLLAMA_BASE_URL = "http://localhost:11434"  # Update to your Ollama server
 
 
-
 def generate_topic_assignment(
-    subject_data: Dict[str, Any],
-    topics: List[str], 
+    subject_name: str,
+    module_name: str,
+    topic_name: str,
     num_questions: int = 5,
-    student_id: Optional[str] = None
+    student_id: Optional[str] = None,
+    topic_id: Optional[str] = None
 ) -> Dict[str, Any]:
     """
-    Generate an assignment for one or multiple topics with a specified total question count.
+    Generate an assignment for a single topic with difficulty adjusted based on student mastery level.
+    Pass Firestore topic_id to align BKT tracking with DB IDs.
     
     Args:
-        subject_data: The complete subject structure from Firebase
-        topics: List of topic names to include in the assignment
-        num_questions: Total number of questions to generate across all topics combined
+        subject_name: Name of the subject
+        module_name: Name of the module
+        topic_name: Name of the topic
+        num_questions: Number of questions to generate
         student_id: Optional student ID to personalize difficulty
+        topic_id: Optional Firestore ID for the topic (preferred over generated key)
     
     Returns:
         Dictionary containing the assignment data
     """
-    subject_name = subject_data["name"]
+    # Use Firestore topic_id if provided; otherwise derive a deterministic slug
+    topic_key = topic_id or f"{subject_name}-{module_name}-{topic_name}".replace(" ", "_").lower()
     
-    # Get module names for each topic and collect BKT params if available
-    topics_info = []
-    for module in subject_data["modules"]:
-        module_name = module["name"]
-        for topic in module["topics"]:
-            if topic["name"] in topics:
-                # Get BKT params for this student-topic pair if student_id provided
-                difficulty = "medium"
-                if student_id:
-                    topic_key = f"{subject_name}-{module_name}-{topic['name']}".replace(" ", "_").lower()
-                    bkt_params = get_student_bkt_params(student_id, topic_key)
-                    p_L = bkt_params.get("p_L", 0.0)
-                    if p_L < 0.3:
-                        difficulty = "basic"
-                    elif p_L < 0.7:
-                        difficulty = "medium"
-                    else:
-                        difficulty = "advanced"
-                    print(f"Topic: {topic['name']} - Mastery level: {p_L:.2f}, difficulty: {difficulty}")
-                
-                topics_info.append({
-                    "name": topic["name"],
-                    "module_name": module_name,
-                    "difficulty": difficulty
-                })
+    # Get BKT params for this student-topic pair if student_id provided
+    difficulty = "medium"
+    if student_id:
+        bkt_params = get_student_bkt_params(student_id, topic_key)
+        p_L = bkt_params.get("p_L", 0.0)
+        if p_L < 0.3:
+            difficulty = "basic"
+        elif p_L < 0.7:
+            difficulty = "medium"
+        else:
+            difficulty = "advanced"
+        print(f"Student mastery level: {p_L:.2f}, setting difficulty to: {difficulty}")
     
-    if not topics_info:
-        raise ValueError("No valid topics found in the provided list.")
-    
-    # Create a consolidated prompt for all topics
-    topics_context = "\n".join([
-        f"Topic: {t['name']} (from {t['module_name']}) - Difficulty: {t['difficulty']}"
-        for t in topics_info
-    ])
+    # Create context for the prompt
+    context = f"Subject: {subject_name}\nModule: {module_name}\nTopic: {topic_name}"
     
     prompt = f"""
     Based on the following academic context:
-    Subject: {subject_name}
-    {topics_context}
+    {context}
     
-    Create exactly {num_questions} open-ended questions distributed across the topics listed above.
-    For topics with lower difficulty levels, make questions easier.
-    For topics with higher difficulty levels, make questions more challenging.
+    Create exactly {num_questions} open-ended questions about "{topic_name}" at {difficulty} difficulty level.
     
     For each question:
-    1. Create a clear, specific question that tests understanding of the associated topic
+    1. Create a clear, specific question that tests understanding of {topic_name}
     2. Provide a detailed model answer that would be considered excellent
     3. List 5-8 key concepts that should be present in a good answer
     4. Include 2-3 common misconceptions students might have
-    5. Specify which topic this question belongs to
-    6. Specify the difficulty level (easy, medium, or hard)
+    5. Specify the difficulty level (easy, medium, or hard)
     
     Format as valid JSON:
     [
@@ -97,12 +79,10 @@ def generate_topic_assignment(
         "model_answer": "Comprehensive model answer here...",
         "key_concepts": ["Concept 1", "Concept 2", "Concept 3", "Concept 4", "Concept 5"],
         "common_misconceptions": ["Misconception 1", "Misconception 2"],
-        "difficulty": "easy|medium|hard",
-        "topic": "Topic name here"
+        "difficulty": "{difficulty}"
       }}
     ]
     
-    Ensure you create a total of exactly {num_questions} questions distributed reasonably across all topics.
     Only return the JSON format, nothing else.
     """
     
@@ -118,19 +98,19 @@ def generate_topic_assignment(
             print(f"⚠️ Failed to generate assignment questions")
             raise ValueError("Failed to generate valid assignment questions. Please try again.")
         
-        # Add module info to each question
+        # Add topic and module info to each question
         for question in assignment_questions:
-            topic_name = question.get("topic", topics_info[0]["name"])  # Default to first topic if missing
-            # Find the corresponding module
-            module_name = next((t["module_name"] for t in topics_info if t["name"] == topic_name), 
-                            topics_info[0]["module_name"])  # Default to first module if not found
+            question["topic"] = topic_name
             question["module"] = module_name
             
-        print(f"✅ Generated {len(assignment_questions)} questions across {len(topics_info)} topics")
+        print(f"✅ Generated {len(assignment_questions)} questions for topic: {topic_name}")
         
         return {
-            "title": f"{subject_name} - Assignment",
-            "topics_covered": [t["name"] for t in topics_info],
+            "title": f"{topic_name} - Assignment",
+            "topic": topic_name,
+            "topic_id": topic_key,
+            "subject": subject_name,
+            "module": module_name,
             "questions": assignment_questions,
             "question_count": len(assignment_questions)
         }
@@ -139,13 +119,139 @@ def generate_topic_assignment(
         print(f"❌ Error generating assignment: {str(e)}")
         # Return empty assignment with error message
         return {
-            "title": f"{subject_name} - Assignment",
-            "topics_covered": [t["name"] for t in topics_info],
+            "title": f"{topic_name} - Assignment",
+            "topic": topic_name,
+            "topic_id": topic_key,
+            "subject": subject_name,
+            "module": module_name,
             "questions": [],
             "question_count": 0,
             "error": str(e)
         }
 
+
+def generate_multi_topic_assignment(
+    topics_info: List[Dict[str, Any]],
+    num_questions: int = 5,
+    student_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Generate an assignment with questions from multiple topics.
+    
+    Args:
+        topics_info: List of topic information including subject_name, module_name, topic_name, and topic_id
+        num_questions: Total number of questions to distribute across topics
+        student_id: Optional student ID to personalize difficulty
+        
+    Returns:
+        Dictionary containing the assignment data
+    """
+    if not topics_info:
+        raise ValueError("No topics provided")
+        
+    # Get the subject name from the first topic (assuming all topics are from the same subject)
+    subject_name = topics_info[0]["subject_name"]
+    
+    print(f"🏗️ Generating multi-topic assignment for {subject_name} with {len(topics_info)} topics")
+    
+    # Distribute questions across topics
+    questions_per_topic = max(1, num_questions // len(topics_info))
+    remaining_questions = num_questions % len(topics_info)
+    
+    all_questions = []
+    topics_covered = []
+    
+    for i, topic_info in enumerate(topics_info):
+        # Calculate number of questions for this topic
+        topic_question_count = questions_per_topic + (1 if i < remaining_questions else 0)
+        
+        if topic_question_count == 0:
+            continue
+            
+        topic_name = topic_info["topic_name"]
+        module_name = topic_info["module_name"]
+        topic_id = topic_info["topic_id"]
+        
+        print(f"📝 Generating {topic_question_count} questions for topic: {topic_name}")
+        
+        # Generate questions for this topic
+        topic_assignment = generate_topic_assignment(
+            subject_name=subject_name,
+            module_name=module_name,
+            topic_name=topic_name,
+            num_questions=topic_question_count,
+            student_id=student_id,
+            topic_id=topic_id
+        )
+        
+        # Add questions to the collection
+        all_questions.extend(topic_assignment.get("questions", []))
+        topics_covered.append(topic_name)
+    
+    # Create the complete multi-topic assignment
+    assignment = {
+        "title": f"{subject_name} - Multi-Topic Assignment",
+        "topics_covered": topics_covered,
+        "questions": all_questions,
+        "question_count": len(all_questions)
+    }
+    
+    print(f"✅ Generated multi-topic assignment with {len(all_questions)} questions covering {len(topics_covered)} topics")
+    
+    return assignment
+
+
+def generate_assignment_for_topics(
+    student_id: str, 
+    topic_ids: List[str], 
+    num_questions: int = 5
+) -> Optional[Dict[str, Any]]:
+    """
+    Wrapper function: resolve subject/module/topic names for Firestore topic_ids,
+    then call generate_multi_topic_assignment.
+    
+    Args:
+        student_id: Student ID for personalization
+        topic_ids: List of Firestore topic IDs to include in the assignment
+        num_questions: Total number of questions to generate across all topics
+        
+    Returns:
+        Dictionary containing the assignment data
+    """
+    try:
+        topics_info = []
+        subjects = get_all_subjects()
+        
+        # Resolve topic information from topic IDs
+        for subject in subjects:
+            modules = get_subject_modules(subject["id"])
+            for module in modules:
+                topics = get_module_topics(subject["id"], module["id"])
+                for topic in topics:
+                    if topic["id"] in topic_ids:
+                        topics_info.append({
+                            "subject_name": subject["name"],
+                            "module_name": module["name"],
+                            "topic_name": topic["name"],
+                            "topic_id": topic["id"]
+                        })
+        
+        if not topics_info:
+            print(f"❌ No valid topics found for IDs: {topic_ids}")
+            return None
+            
+        return generate_multi_topic_assignment(
+            topics_info=topics_info,
+            num_questions=num_questions,
+            student_id=student_id
+        )
+        
+    except Exception as e:
+        print(f"❌ Error generating assignment for topics {topic_ids}: {e}")
+        return None
+
+
+# Keep these helper functions unchanged
 def parse_assignment_to_json(raw_text: str) -> List[Dict[str, Any]]:
     """
     Parse the raw text from the LLM into a structured assignment format.
@@ -171,6 +277,7 @@ def parse_assignment_to_json(raw_text: str) -> List[Dict[str, Any]]:
         return validated_questions
     except json.JSONDecodeError:
         return []
+
 
 def evaluate_assignment_answer(
     student_answer: str, 

@@ -5,6 +5,10 @@ import ParallaxSection from '../common/ParallaxSection';
 import Card from '../common/Card';
 import Button from '../common/Button';
 
+// Local storage keys
+const LS_ASSIGNMENT_KEY = 'knowell_assignment';
+const LS_ANSWERS_KEY = 'knowell_assignment_answers';
+
 const AssignmentInterface = () => {
   const { currentUser } = useContext(AuthContext);
   // State for selection flow
@@ -20,11 +24,12 @@ const AssignmentInterface = () => {
   const [answers, setAnswers] = useState({});
   const [feedback, setFeedback] = useState({});
   const [isLoading, setIsLoading] = useState(false);
+  const [isSending, setIsSending] = useState(false); // Added for request feedback
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState(0);
   const [numQuestions, setNumQuestions] = useState(5);
 
-  // Fetch subjects on component mount
+  // Check local storage for saved assignment on component mount
   useEffect(() => {
     const fetchSubjects = async () => {
       try {
@@ -36,7 +41,30 @@ const AssignmentInterface = () => {
     };
 
     fetchSubjects();
+    
+    // Check for saved assignment in local storage
+    const savedAssignment = localStorage.getItem(LS_ASSIGNMENT_KEY);
+    const savedAnswers = localStorage.getItem(LS_ANSWERS_KEY);
+    
+    if (savedAssignment) {
+      try {
+        setAssignment(JSON.parse(savedAssignment));
+        if (savedAnswers) {
+          setAnswers(JSON.parse(savedAnswers));
+        }
+        console.log('Loaded assignment from local storage');
+      } catch (e) {
+        console.error('Error loading assignment from local storage:', e);
+      }
+    }
   }, []);
+
+  // Save answers to local storage whenever they change
+  useEffect(() => {
+    if (Object.keys(answers).length > 0) {
+      localStorage.setItem(LS_ANSWERS_KEY, JSON.stringify(answers));
+    }
+  }, [answers]);
 
   // Fetch modules when subject is selected
   const fetchModules = async (subjectId) => {
@@ -60,10 +88,10 @@ const AssignmentInterface = () => {
 
   // Handle topic selection/deselection - always handle as multi-select
   const handleTopicSelect = (topic) => {
-    if (selectedTopics.includes(topic.name)) {
-      setSelectedTopics(selectedTopics.filter(name => name !== topic.name));
+    if (selectedTopics.includes(topic.id)) {
+      setSelectedTopics(selectedTopics.filter(id => id !== topic.id));
     } else {
-      setSelectedTopics([...selectedTopics, topic.name]);
+      setSelectedTopics([...selectedTopics, topic.id]);
     }
   };
 
@@ -88,32 +116,48 @@ const AssignmentInterface = () => {
     }
 
     setIsLoading(true);
+    setIsSending(true); // Show sending indicator
+    
     try {
       const response = await assignmentApi.generateAssignment({
         subject_id: selectedSubject,
-        topics: selectedTopics,
+        topic_ids: selectedTopics,  // Changed from topics to topic_ids
         num_questions: numQuestions,
         student_id: currentUser.id
       });
       
-      setAssignment(response.data.questions);
+      const assignmentData = response.data.questions;
+      setAssignment(assignmentData);
       setAnswers({}); // Reset answers
       setFeedback({}); // Reset feedback
+      
+      // Store in local storage
+      localStorage.setItem(LS_ASSIGNMENT_KEY, JSON.stringify(assignmentData));
+      localStorage.removeItem(LS_ANSWERS_KEY); // Clear previous answers
+      
     } catch (error) {
       console.error('Error generating assignment:', error);
+      alert('Failed to generate assignment. Please try again.');
     } finally {
       setIsLoading(false);
+      setIsSending(false);
     }
   };
 
   // Reset assignment and selection
   const resetAssignment = () => {
-    setAssignment(null);
-    setSelectedSubject(null);
-    setSelectedModule(null);
-    setSelectedTopics([]);
-    setAnswers({});
-    setFeedback({});
+    if (window.confirm('Are you sure you want to finish this assignment?')) {
+      setAssignment(null);
+      setSelectedSubject(null);
+      setSelectedModule(null);
+      setSelectedTopics([]);
+      setAnswers({});
+      setFeedback({});
+      
+      // Clear local storage
+      localStorage.removeItem(LS_ASSIGNMENT_KEY);
+      localStorage.removeItem(LS_ANSWERS_KEY);
+    }
   };
 
   const handleAnswerChange = (questionIndex, value) => {
@@ -129,11 +173,13 @@ const AssignmentInterface = () => {
     setIsSubmitting(true);
     try {
       const question = assignment[questionIndex];
-      const response = await assignmentApi.evaluateAnswer(
-        currentUser.id,
-        questionIndex,
-        answers[questionIndex]
-      );
+      
+      // Update evaluation API call to match backend
+      const response = await assignmentApi.evaluateAnswer({
+        student_id: currentUser.id,
+        question_data: question, // Send the full question data for evaluation
+        answer: answers[questionIndex]
+      });
       
       setFeedback({
         ...feedback,
@@ -141,6 +187,7 @@ const AssignmentInterface = () => {
       });
     } catch (error) {
       console.error('Error submitting answer:', error);
+      alert('Failed to evaluate answer. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -234,10 +281,10 @@ const AssignmentInterface = () => {
                   {topics.map((topic) => (
                     <div
                       key={topic.id}
-                      className={`tile ${selectedTopics.includes(topic.name) ? 'selected' : ''}`}
+                      className={`tile ${selectedTopics.includes(topic.id) ? 'selected' : ''}`}
                       onClick={() => handleTopicSelect(topic)}
                     >
-                      {selectedTopics.includes(topic.name) && (
+                      {selectedTopics.includes(topic.id) && (
                         <span className="checkmark">✓</span>
                       )}
                       {topic.name}
@@ -245,13 +292,23 @@ const AssignmentInterface = () => {
                   ))}
                 </div>
                 <div className="mt-4">
-                  <button onClick={generateAssignment} className="btn btn-primary" disabled={selectedTopics.length === 0}>
-                    Generate Assignment
+                  <button 
+                    onClick={generateAssignment} 
+                    className="btn btn-primary" 
+                    disabled={selectedTopics.length === 0 || isSending}
+                  >
+                    {isSending ? 'Generating...' : 'Generate Assignment'}
                   </button>
                   <button onClick={goBack} className="btn btn-secondary ml-2">
                     Back
                   </button>
                 </div>
+                {isSending && (
+                  <div className="mt-4 text-center">
+                    <p>Generating your assignment, please wait...</p>
+                    <div className="loader mt-2 mx-auto"></div>
+                  </div>
+                )}
               </>
             )}
           </div>
