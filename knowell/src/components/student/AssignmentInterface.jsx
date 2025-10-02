@@ -4,6 +4,7 @@ import { assignmentApi, topicsApi, modulesApi } from '../../services/api';
 import ParallaxSection from '../common/ParallaxSection';
 import Card from '../common/Card';
 import Button from '../common/Button';
+import { useNavigate } from 'react-router-dom';
 
 // Local storage keys
 const LS_ASSIGNMENT_KEY = 'knowell_assignment';
@@ -11,6 +12,7 @@ const LS_ANSWERS_KEY = 'knowell_assignment_answers';
 
 const AssignmentInterface = () => {
   const { currentUser } = useContext(AuthContext);
+  const navigate = useNavigate();
   // State for selection flow
   const [subjects, setSubjects] = useState([]);
   const [modules, setModules] = useState([]);
@@ -24,10 +26,13 @@ const AssignmentInterface = () => {
   const [answers, setAnswers] = useState({});
   const [feedback, setFeedback] = useState({});
   const [isLoading, setIsLoading] = useState(false);
-  const [isSending, setIsSending] = useState(false); // Added for request feedback
+  const [isSending, setIsSending] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [activeQuestion, setActiveQuestion] = useState(0);
   const [numQuestions, setNumQuestions] = useState(5);
+  
+  // New state for showing results summary
+  const [showResults, setShowResults] = useState(false);
 
   // Check local storage for saved assignment on component mount
   useEffect(() => {
@@ -86,7 +91,7 @@ const AssignmentInterface = () => {
     }
   };
 
-  // Handle topic selection/deselection - always handle as multi-select
+  // Handle topic selection/deselection
   const handleTopicSelect = (topic) => {
     if (selectedTopics.includes(topic.id)) {
       setSelectedTopics(selectedTopics.filter(id => id !== topic.id));
@@ -116,24 +121,24 @@ const AssignmentInterface = () => {
     }
 
     setIsLoading(true);
-    setIsSending(true); // Show sending indicator
+    setIsSending(true);
     
     try {
       const response = await assignmentApi.generateAssignment({
         subject_id: selectedSubject,
-        topic_ids: selectedTopics,  // Changed from topics to topic_ids
+        topic_ids: selectedTopics,
         num_questions: numQuestions,
         student_id: currentUser.id
       });
       
       const assignmentData = response.data.questions;
       setAssignment(assignmentData);
-      setAnswers({}); // Reset answers
-      setFeedback({}); // Reset feedback
+      setAnswers({});
+      setFeedback({});
       
       // Store in local storage
       localStorage.setItem(LS_ASSIGNMENT_KEY, JSON.stringify(assignmentData));
-      localStorage.removeItem(LS_ANSWERS_KEY); // Clear previous answers
+      localStorage.removeItem(LS_ANSWERS_KEY);
       
     } catch (error) {
       console.error('Error generating assignment:', error);
@@ -153,6 +158,7 @@ const AssignmentInterface = () => {
       setSelectedTopics([]);
       setAnswers({});
       setFeedback({});
+      setShowResults(false);
       
       // Clear local storage
       localStorage.removeItem(LS_ASSIGNMENT_KEY);
@@ -174,10 +180,9 @@ const AssignmentInterface = () => {
     try {
       const question = assignment[questionIndex];
       
-      // Update evaluation API call to match backend
       const response = await assignmentApi.evaluateAnswer({
         student_id: currentUser.id,
-        question_data: question, // Send the full question data for evaluation
+        question_data: question,
         answer: answers[questionIndex]
       });
       
@@ -194,15 +199,78 @@ const AssignmentInterface = () => {
   };
 
   const handleNext = () => {
-    if (activeQuestion < assignment.length - 1) {
-      setActiveQuestion(activeQuestion + 1);
+    if (currentQuestion < assignment.length - 1) {
+      setCurrentQuestion(currentQuestion + 1);
     }
   };
 
   const handlePrevious = () => {
-    if (activeQuestion > 0) {
-      setActiveQuestion(activeQuestion - 1);
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1);
     }
+  };
+
+  // New function to finish assignment and show results
+  const finishAssignment = () => {
+    if (Object.keys(feedback).length < assignment.length) {
+      const unsubmittedCount = assignment.length - Object.keys(feedback).length;
+      if (!window.confirm(`You have ${unsubmittedCount} unanswered questions. Are you sure you want to finish?`)) {
+        return;
+      }
+    }
+    
+    setShowResults(true);
+  };
+
+  // New function to go back to dashboard
+  const goToDashboard = () => {
+    resetAssignment();
+    navigate('/student/dashboard');
+  };
+
+  // Calculate result statistics
+  const calculateResults = () => {
+    if (!assignment || !feedback) return null;
+    
+    // Get all questions that have feedback
+    const answeredQuestions = Object.keys(feedback).map(idx => parseInt(idx));
+    const totalAnswered = answeredQuestions.length;
+    
+    // Calculate overall score
+    let totalScore = 0;
+    for (const idx of answeredQuestions) {
+      totalScore += feedback[idx].score || 0;
+    }
+    const averageScore = totalAnswered > 0 ? totalScore / totalAnswered : 0;
+    
+    // Group by topic
+    const topicPerformance = {};
+    for (const idx of answeredQuestions) {
+      const questionTopic = assignment[idx].topic;
+      if (!topicPerformance[questionTopic]) {
+        topicPerformance[questionTopic] = {
+          count: 0,
+          score: 0
+        };
+      }
+      topicPerformance[questionTopic].count++;
+      topicPerformance[questionTopic].score += feedback[idx].score || 0;
+    }
+    
+    // Calculate average per topic
+    for (const topic in topicPerformance) {
+      if (topicPerformance[topic].count > 0) {
+        topicPerformance[topic].average = 
+          topicPerformance[topic].score / topicPerformance[topic].count;
+      }
+    }
+    
+    return {
+      totalQuestions: assignment.length,
+      answeredQuestions: totalAnswered,
+      averageScore,
+      topicPerformance
+    };
   };
 
   // Assignment generation form with tile-based selection
@@ -330,8 +398,92 @@ const AssignmentInterface = () => {
       </div>
     );
   }
+  
+  // Show results summary when complete
+  if (showResults) {
+    const results = calculateResults();
+    
+    return (
+      <div className="assignment-interface">
+        <ParallaxSection className="assignment-header">
+          <h2 className="text-2xl font-bold mb-4">Assignment Results</h2>
+          <p>Review your performance and continue learning</p>
+        </ParallaxSection>
+        
+        <Card>
+          <div className="results-summary">
+            <h3 className="text-xl font-bold mb-6 text-center">Assignment Complete!</h3>
+            
+            <div className="overall-score mb-6 text-center">
+              <div className="score-circle mx-auto mb-2" style={{
+                width: '120px',
+                height: '120px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '28px',
+                fontWeight: 'bold',
+                background: `conic-gradient(
+                  #4CAF50 0% ${results.averageScore * 100}%, 
+                  #e0e0e0 ${results.averageScore * 100}% 100%
+                )`
+              }}>
+                <span className="bg-white rounded-full flex items-center justify-center" style={{
+                  width: '100px',
+                  height: '100px'
+                }}>
+                  {Math.round(results.averageScore * 100)}%
+                </span>
+              </div>
+              <p className="text-lg">Overall Score</p>
+            </div>
+            
+            <div className="stats-grid grid grid-cols-2 gap-4 mb-6">
+              <div className="stat-box bg-gray-100 p-3 rounded text-center">
+                <div className="text-xl font-bold">{results.answeredQuestions}/{results.totalQuestions}</div>
+                <div className="text-sm">Questions Completed</div>
+              </div>
+              
+              <div className="stat-box bg-gray-100 p-3 rounded text-center">
+                <div className="text-xl font-bold">{Object.keys(results.topicPerformance).length}</div>
+                <div className="text-sm">Topics Covered</div>
+              </div>
+            </div>
+            
+            {Object.keys(results.topicPerformance).length > 0 && (
+              <div className="topic-performance mb-6">
+                <h4 className="font-bold mb-2">Performance by Topic:</h4>
+                <div className="space-y-3">
+                  {Object.entries(results.topicPerformance).map(([topic, data]) => (
+                    <div key={topic} className="topic-score">
+                      <div className="flex justify-between mb-1">
+                        <span>{topic}</span>
+                        <span>{Math.round(data.average * 100)}%</span>
+                      </div>
+                      <div className="progress-bar bg-gray-200 rounded-full h-2.5">
+                        <div 
+                          className="h-full rounded-full bg-blue-600" 
+                          style={{width: `${data.average * 100}%`}}
+                        ></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            <div className="action-buttons flex flex-col space-y-3">
+              <Button onClick={() => resetAssignment()}>Start New Assignment</Button>
+              <Button type="secondary" onClick={() => goToDashboard()}>Return to Dashboard</Button>
+            </div>
+          </div>
+        </Card>
+      </div>
+    );
+  }
 
-  // Assignment display (existing code)
+  // Assignment question display
   const currentQuestion = assignment[activeQuestion];
   const hasFeedback = feedback[activeQuestion];
 
@@ -416,7 +568,7 @@ const AssignmentInterface = () => {
           </Button>
           
           {activeQuestion === assignment.length - 1 ? (
-            <Button onClick={resetAssignment} type="secondary">
+            <Button onClick={finishAssignment} type="primary">
               Finish Assignment
             </Button>
           ) : (
