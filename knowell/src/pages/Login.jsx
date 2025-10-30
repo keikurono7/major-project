@@ -16,17 +16,11 @@ const Login = () => {
     setError('');
     
     try {
-      const user = {
-        id: credentials.username,
-        username: credentials.username,
-        role: isStudent ? 'student' : 'teacher',
-        fullName: isStudent ? 'John Doe' : 'Dr. Smith',
-      };
-      
-      login(user);
+      const user = await login(credentials.username, credentials.password);
       navigate(isStudent ? '/student' : '/teacher');
     } catch (err) {
-      setError('Login failed. Please check your credentials.');
+      // surface actual error message from backend/auth service
+      setError(err?.message || 'Login failed. Please check your credentials.');
     }
   };
 
@@ -38,62 +32,129 @@ const Login = () => {
   };
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: '16px'
-    }}>
-      <div style={{
-        width: '100%',
-        maxWidth: '400px',
-        position: 'relative'
-      }}>
-        {/* Login Card */}
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '16px',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-          overflow: 'hidden'
-        }}>
-          {/* Header */}
+    <div className="login-layout" style={{ minHeight: '100vh' }}>
+      {/* Responsive styles */}
+      <style>{`
+        .login-layout {
+          display: flex;
+          flex-direction: column;
+        }
+        .login-left {
+          background: linear-gradient(180deg, #ca404f 0%, #a7373f 100%);
+          color: white;
+          padding: 48px 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .login-left .brand {
+          text-align: center;
+        }
+        .login-left .brand h1 {
+          margin: 16px 0 8px;
+          font-size: 2rem;
+          font-weight: 700;
+        }
+        .login-left .brand p {
+          margin: 0;
+          opacity: 0.95;
+        }
+        .login-right {
+          padding: 32px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .login-card {
+          width: 100%;
+          max-width: 520px;
+        }
+        /* Desktop: two columns */
+        @media (min-width: 768px) {
+          .login-layout {
+            flex-direction: row;
+          }
+          .login-left, .login-right {
+            flex: 1 1 50%;
+            min-height: 100vh;
+          }
+          .login-left {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 64px;
+          }
+          .login-right {
+            align-items: center;
+            justify-content: center;
+            padding: 64px;
+            background: #f3f4f6;
+          }
+          .login-card {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.1), 0 10px 10px -5px rgba(0,0,0,0.04);
+            overflow: hidden;
+            padding: 0;
+          }
+        }
+      `}</style>
+
+      {/* Left / Branding */}
+      <div className="login-left">
+        <div className="brand" style={{ maxWidth: 360 }}>
           <div style={{
-            background: '#ca404f',
-            padding: '32px',
-            textAlign: 'center',
-            color: 'white'
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 96,
+            height: 96,
+            backgroundColor: 'rgba(255,255,255,0.12)',
+            borderRadius: '50%',
+            margin: '0 auto'
           }}>
-            <div style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              width: '64px',
-              height: '64px',
-              backgroundColor: 'rgba(255, 255, 255, 0.2)',
-              borderRadius: '50%',
-              marginBottom: '16px'
-            }}>
-              <BookOpen size={32} />
-            </div>
-            <h1 style={{
-              fontSize: '1.875rem',
-              fontWeight: 'bold',
-              margin: '0 0 8px 0'
-            }}>
-              Knowell
-            </h1>
-            <p style={{
-              opacity: 0.9,
-              margin: 0
-            }}>
-              AI-Powered Learning Platform
-            </p>
+            <BookOpen size={44} />
           </div>
-          
+          <h1>Knowell</h1>
+          <p style={{ marginTop: 8 }}>AI-Powered Learning Platform</p>
+          <p style={{ marginTop: 16, opacity: 0.95, fontSize: '0.95rem' }}>
+            Personalized learning paths, assignments and insights for students and teachers.
+          </p>
+        </div>
+      </div>
+
+      {/* Right / Form */}
+      <div className="login-right">
+        <div className="login-card">
+          {/* Header (mobile shows colored header inside card; desktop header is left panel) */}
+          <div style={{
+            background: '#ffffff',
+            padding: '28px 32px',
+            display: 'block'
+          }}>
+            {/* On mobile show small colored bar with icon to keep branding */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{
+                width: 48,
+                height: 48,
+                borderRadius: 12,
+                background: '#ca404f',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'white'
+              }}>
+                <BookOpen size={20} />
+              </div>
+              <div>
+                <h2 style={{ margin: 0, fontSize: '1.25rem' }}>Welcome back</h2>
+                <p style={{ margin: 0, color: '#6b7280', fontSize: '0.875rem' }}>Sign in to continue</p>
+              </div>
+            </div>
+          </div>
+
           {/* Form Content */}
-          <div style={{ padding: '32px' }}>
-            {/* Error Message */}
+          <div style={{ padding: '28px 32px' }}>
             {error && (
               <div style={{
                 marginBottom: '24px',
@@ -107,7 +168,7 @@ const Login = () => {
                 {error}
               </div>
             )}
-            
+
             {/* Role Selector */}
             <div style={{ marginBottom: '24px' }}>
               <div style={{
@@ -165,10 +226,9 @@ const Login = () => {
                 </button>
               </div>
             </div>
-            
-            {/* Login Form */}
+
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Username Field */}
+              {/* Username */}
               <div>
                 <label style={{
                   display: 'block',
@@ -220,8 +280,8 @@ const Login = () => {
                   />
                 </div>
               </div>
-              
-              {/* Password Field */}
+
+              {/* Password */}
               <div>
                 <label style={{
                   display: 'block',
@@ -273,8 +333,7 @@ const Login = () => {
                   />
                 </div>
               </div>
-              
-              {/* Submit Button */}
+
               <button 
                 type="submit"
                 style={{
@@ -302,55 +361,35 @@ const Login = () => {
                 Login as {isStudent ? 'Student' : 'Teacher'}
               </button>
             </form>
-            
-            {/* Demo Credentials */}
-            <div style={{
-              marginTop: '24px',
-              padding: '16px',
-              backgroundColor: '#f8fafc',
-              borderRadius: '8px'
-            }}>
-              <p style={{
-                fontSize: '0.75rem',
-                fontWeight: '500',
-                color: '#374151',
-                margin: '0 0 8px 0'
-              }}>
-                Demo Credentials:
-              </p>
-              <div style={{
-                fontSize: '0.75rem',
-                color: '#6b7280',
-                lineHeight: 1.5
-              }}>
-                <p style={{ margin: '2px 0' }}><strong>Student:</strong> demo_student / password123</p>
-                <p style={{ margin: '2px 0' }}><strong>Teacher:</strong> demo_teacher / password123</p>
-              </div>
-            </div>
           </div>
-        </div>
-        
-        {/* Footer */}
-        <div style={{
-          textAlign: 'center',
-          marginTop: '32px'
-        }}>
-          <p style={{
-            fontSize: '0.875rem',
-            color: 'rgba(255, 255, 255, 0.8)'
+
+          {/* Footer */}
+          <div style={{
+            textAlign: 'center',
+            marginTop: '12px',
+            padding: '12px 32px 28px'
           }}>
-            Don't have an account?{' '}
-            <button style={{
-              color: 'white',
-              fontWeight: '500',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              textDecoration: 'underline'
+            <p style={{
+              fontSize: '0.875rem',
+              color: '#6b7280'
             }}>
-              Contact your administrator
-            </button>
-          </p>
+              Don't have an account?{' '}
+              <button
+                style={{
+                  color: '#ca404f',
+                  fontWeight: '500',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textDecoration: 'underline'
+                }}
+                onClick={() => navigate('/register')}
+                type="button"
+              >
+                Sign up
+              </button>
+            </p>
+          </div>
         </div>
       </div>
     </div>

@@ -4,11 +4,12 @@ import { AuthContext } from "../contexts/AuthContext";
 import Navbar from "../components/common/Navbar";
 import Sidebar from "../components/common/Sidebar";
 import { paperApi } from "../services/api";
-import ContentUpload from "../components/teacher/ContentUpload";
 import PaperGenerator from "../components/teacher/PaperGenerator";
 import Analytics from "../components/teacher/Analytics";
 import { useForm } from 'react-hook-form'; // Add this import
 import '../dashboard.css';
+import StudentMonitoring from '../components/teacher/StudentMonitoring';
+import { createClass, getClassesForUser } from '../services/class';
 
 // Using string icons to match your existing sidebar structure
 const sidebarItems = [
@@ -63,6 +64,9 @@ const mockStudents = [
 
 const TeacherHome = () => {
   const { currentUser } = useContext(AuthContext);
+  const { user } = useContext(AuthContext) || {};
+  const ctx = useContext(AuthContext) || {};
+  const { setCurrentClassId, setClasses } = ctx;
   const [activeTab, setActiveTab] = useState("dashboard");
   const [papers, setPapers] = useState([]);
   const [loading, setLoading] = useState(true);

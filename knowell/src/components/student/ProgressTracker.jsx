@@ -1,22 +1,39 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { getProgressData } from '../../services/progress';
 
-const ProgressTracker = ({ progress }) => {
-  // Convert confidence scores object to array for sorting
-  const topicsArray = Object.entries(progress || {}).map(([topic, score]) => ({
-    topic,
-    score,
-    color: getColorForScore(score)
-  }));
+const ProgressTracker = () => {
+  const [selectedSubject, setSelectedSubject] = useState(localStorage.getItem('currentSubjectId') || null);
 
-  // Sort by confidence score (ascending)
-  topicsArray.sort((a, b) => a.score - b.score);
+  useEffect(() => {
+    const handleSubjectChange = () => {
+      setSelectedSubject(localStorage.getItem('currentSubjectId') || null);
+    };
+    window.addEventListener('subjectChanged', handleSubjectChange);
+    window.addEventListener('storage', handleSubjectChange);
+    return () => {
+      window.removeEventListener('subjectChanged', handleSubjectChange);
+      window.removeEventListener('storage', handleSubjectChange);
+    };
+  }, []);
 
-  // Helper function to get color based on confidence score
-  function getColorForScore(score) {
-    if (score < 0.3) return 'var(--danger)';
-    if (score < 0.6) return 'var(--warning)';
-    return 'var(--success)';
+  useEffect(() => {
+    const fetchProgress = async () => {
+      if (!selectedSubject) return;
+      try {
+        const data = await getProgressData(selectedSubject);
+        // ...existing logic to set progress data, filtering by selectedSubject...
+      } catch (err) {
+        console.error('Failed to load progress', err);
+      }
+    };
+    fetchProgress();
+  }, [selectedSubject]);
+
+  if (!selectedSubject) {
+    return <div style={{ padding: 16 }}>Please select a subject from the header to view progress.</div>;
   }
+
+  const progress = data || {};
 
   return (
     <div className="progress-tracker">
@@ -36,7 +53,7 @@ const ProgressTracker = ({ progress }) => {
       </div>
       
       <div className="mt-4">
-        {topicsArray.map(({ topic, score, color }) => (
+        {Object.entries(progress || {}).map(([topic, score]) => (
           <div key={topic} className="mb-3">
             <div className="flex justify-between mb-1">
               <span>{topic}</span>
@@ -45,7 +62,7 @@ const ProgressTracker = ({ progress }) => {
             <div className="progress-container">
               <div 
                 className="progress-bar" 
-                style={{ width: `${score * 100}%`, backgroundColor: color }}
+                style={{ width: `${score * 100}%`, backgroundColor: getColorForScore(score) }}
               ></div>
             </div>
           </div>

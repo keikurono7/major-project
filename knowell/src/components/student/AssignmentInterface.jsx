@@ -1,586 +1,539 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../../contexts/AuthContext';
-import { assignmentApi, topicsApi, modulesApi } from '../../services/api';
-import ParallaxSection from '../common/ParallaxSection';
-import Card from '../common/Card';
-import Button from '../common/Button';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { assignmentApi } from '../../services/api';
+import { computeAllSubjectsProgress } from '../../services/progress';
+import '../../dashboard.css';
 
-// Local storage keys
-const LS_ASSIGNMENT_KEY = 'knowell_assignment';
-const LS_ANSWERS_KEY = 'knowell_assignment_answers';
-
-const AssignmentInterface = () => {
-  const { currentUser } = useContext(AuthContext);
-  const navigate = useNavigate();
-  // State for selection flow
+const AssignmentInterface = ({ studentId }) => {
   const [subjects, setSubjects] = useState([]);
-  const [modules, setModules] = useState([]);
-  const [topics, setTopics] = useState([]);
-  const [selectedSubject, setSelectedSubject] = useState(null);
+  const [selectedSubjectId, setSelectedSubjectId] = useState(localStorage.getItem('currentSubjectId') || null);
   const [selectedModule, setSelectedModule] = useState(null);
-  const [selectedTopics, setSelectedTopics] = useState([]);
-  
-  // State for assignments
-  const [assignment, setAssignment] = useState(null);
-  const [answers, setAnswers] = useState({});
-  const [feedback, setFeedback] = useState({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSending, setIsSending] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [activeQuestion, setActiveQuestion] = useState(0);
+  const [selectedTopic, setSelectedTopic] = useState(null);
   const [numQuestions, setNumQuestions] = useState(5);
-  
-  // New state for showing results summary
+  const [assignment, setAssignment] = useState(null);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [userAnswers, setUserAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState('module'); // Changed from 'subject' to 'module'
 
-  // Check local storage for saved assignment on component mount
   useEffect(() => {
-    const fetchSubjects = async () => {
-      try {
-        const response = await modulesApi.getAll();
-        setSubjects(response.data.subjects || []);
-      } catch (error) {
-        console.error('Error fetching subjects:', error);
+    fetchSubjects();
+  }, []);
+
+  // Listen for subject changes from header
+  useEffect(() => {
+    const handleSubjectChange = () => {
+      const newSubjectId = localStorage.getItem('currentSubjectId');
+      if (newSubjectId && newSubjectId !== selectedSubjectId) {
+        setSelectedSubjectId(newSubjectId);
+        // Reset assignment state when subject changes
+        setSelectedModule(null);
+        setSelectedTopic(null);
+        setAssignment(null);
+        setStep('module');
       }
     };
 
-    fetchSubjects();
+    window.addEventListener('subjectChanged', handleSubjectChange);
+    window.addEventListener('storage', handleSubjectChange);
     
-    // Check for saved assignment in local storage
-    const savedAssignment = localStorage.getItem(LS_ASSIGNMENT_KEY);
-    const savedAnswers = localStorage.getItem(LS_ANSWERS_KEY);
+    const interval = setInterval(handleSubjectChange, 500);
     
-    if (savedAssignment) {
-      try {
-        setAssignment(JSON.parse(savedAssignment));
-        if (savedAnswers) {
-          setAnswers(JSON.parse(savedAnswers));
-        }
-        console.log('Loaded assignment from local storage');
-      } catch (e) {
-        console.error('Error loading assignment from local storage:', e);
+    return () => {
+      window.removeEventListener('subjectChanged', handleSubjectChange);
+      window.removeEventListener('storage', handleSubjectChange);
+      clearInterval(interval);
+    };
+  }, [selectedSubjectId]);
+
+  const fetchSubjects = async () => {
+    try {
+      const subjectsWithProgress = await computeAllSubjectsProgress(studentId);
+      setSubjects(subjectsWithProgress || []);
+      
+      // If we have a subject selected from header, use it
+      const currentSubjectId = localStorage.getItem('currentSubjectId');
+      if (currentSubjectId) {
+        setSelectedSubjectId(currentSubjectId);
       }
-    }
-  }, []);
-
-  // Save answers to local storage whenever they change
-  useEffect(() => {
-    if (Object.keys(answers).length > 0) {
-      localStorage.setItem(LS_ANSWERS_KEY, JSON.stringify(answers));
-    }
-  }, [answers]);
-
-  // Fetch modules when subject is selected
-  const fetchModules = async (subjectId) => {
-    try {
-      const response = await modulesApi.getBySubject(subjectId);
-      setModules(response.data.modules || []);
     } catch (error) {
-      console.error('Error fetching modules:', error);
+      console.error('Error fetching subjects:', error);
     }
   };
 
-  // Fetch topics when module is selected
-  const fetchTopics = async (moduleId) => {
-    try {
-      const response = await topicsApi.getByModule(moduleId, currentUser.id);
-      setTopics(response.data.topics || []);
-    } catch (error) {
-      console.error('Error fetching topics:', error);
-    }
-  };
-
-  // Handle topic selection/deselection
-  const handleTopicSelect = (topic) => {
-    if (selectedTopics.includes(topic.id)) {
-      setSelectedTopics(selectedTopics.filter(id => id !== topic.id));
-    } else {
-      setSelectedTopics([...selectedTopics, topic.id]);
-    }
-  };
-
-  // Go back in the selection flow
-  const goBack = () => {
-    if (selectedTopics.length > 0) {
-      setSelectedTopics([]);
-    } else if (selectedModule) {
-      setSelectedModule(null);
-      setTopics([]);
-    } else if (selectedSubject) {
-      setSelectedSubject(null);
-      setModules([]);
-    }
-  };
-
-  // Generate assignment with selected topics
-  const generateAssignment = async () => {
-    if (selectedTopics.length === 0) {
-      alert('Please select at least one topic');
+  const handleGenerateAssignment = async () => {
+    if (!selectedTopic) {
+      alert('Please select a topic');
       return;
     }
 
-    setIsLoading(true);
-    setIsSending(true);
-    
+    setLoading(true);
     try {
-      const response = await assignmentApi.generateAssignment({
-        subject_id: selectedSubject,
-        topic_ids: selectedTopics,
-        num_questions: numQuestions,
-        student_id: currentUser.id
+      const response = await assignmentApi.createAssignment({
+        topic_ids: [selectedTopic.id],
+        student_id: studentId,
+        num_questions: numQuestions
       });
-      
-      const assignmentData = response.data.questions;
-      setAssignment(assignmentData);
-      setAnswers({});
-      setFeedback({});
-      
-      // Store in local storage
-      localStorage.setItem(LS_ASSIGNMENT_KEY, JSON.stringify(assignmentData));
-      localStorage.removeItem(LS_ANSWERS_KEY);
-      
+
+      if (response.data.assignment && response.data.assignment.questions) {
+        setAssignment(response.data.assignment);
+        setCurrentQuestionIndex(0);
+        setUserAnswers({});
+        setShowResults(false);
+        setStep('assignment');
+      } else {
+        alert('Failed to generate assignment. Please try again.');
+      }
     } catch (error) {
       console.error('Error generating assignment:', error);
-      alert('Failed to generate assignment. Please try again.');
+      alert('Failed to generate assignment');
     } finally {
-      setIsLoading(false);
-      setIsSending(false);
+      setLoading(false);
     }
   };
 
-  // Reset assignment and selection
-  const resetAssignment = () => {
-    if (window.confirm('Are you sure you want to finish this assignment?')) {
-      setAssignment(null);
-      setSelectedSubject(null);
-      setSelectedModule(null);
-      setSelectedTopics([]);
-      setAnswers({});
-      setFeedback({});
-      setShowResults(false);
-      
-      // Clear local storage
-      localStorage.removeItem(LS_ASSIGNMENT_KEY);
-      localStorage.removeItem(LS_ANSWERS_KEY);
-    }
-  };
-
-  const handleAnswerChange = (questionIndex, value) => {
-    setAnswers({
-      ...answers,
-      [questionIndex]: value
+  const handleAnswerChange = (answer) => {
+    setUserAnswers({
+      ...userAnswers,
+      [currentQuestionIndex]: answer
     });
   };
 
-  const submitAnswer = async (questionIndex) => {
-    if (!answers[questionIndex] || answers[questionIndex].trim() === '') return;
-    
-    setIsSubmitting(true);
-    try {
-      const question = assignment[questionIndex];
-      
-      const response = await assignmentApi.evaluateAnswer({
-        student_id: currentUser.id,
-        question_data: question,
-        answer: answers[questionIndex]
-      });
-      
-      setFeedback({
-        ...feedback,
-        [questionIndex]: response.data
-      });
-    } catch (error) {
-      console.error('Error submitting answer:', error);
-      alert('Failed to evaluate answer. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
   const handleNext = () => {
-    if (currentQuestion < assignment.length - 1) {
-      setCurrentQuestion(currentQuestion + 1);
+    if (currentQuestionIndex < assignment.questions.length - 1) {
+      setCurrentQuestionIndex(currentQuestionIndex + 1);
+    } else {
+      handleSubmitAssignment();
     }
   };
 
   const handlePrevious = () => {
-    if (currentQuestion > 0) {
-      setCurrentQuestion(currentQuestion - 1);
+    if (currentQuestionIndex > 0) {
+      setCurrentQuestionIndex(currentQuestionIndex - 1);
     }
   };
 
-  // New function to finish assignment and show results
-  const finishAssignment = () => {
-    if (Object.keys(feedback).length < assignment.length) {
-      const unsubmittedCount = assignment.length - Object.keys(feedback).length;
-      if (!window.confirm(`You have ${unsubmittedCount} unanswered questions. Are you sure you want to finish?`)) {
-        return;
-      }
+  const handleSubmitAssignment = async () => {
+    try {
+      // In a real implementation, you would submit to backend here
+      console.log('Submitting assignment with answers:', userAnswers);
+      setShowResults(true);
+    } catch (error) {
+      console.error('Error submitting assignment:', error);
+      alert('Failed to submit assignment');
     }
-    
-    setShowResults(true);
   };
 
-  // New function to go back to dashboard
-  const goToDashboard = () => {
-    resetAssignment();
-    navigate('/student/dashboard');
+  const handleRetakeAssignment = () => {
+    setAssignment(null);
+    setCurrentQuestionIndex(0);
+    setUserAnswers({});
+    setShowResults(false);
+    setStep('module');
+    setSelectedModule(null);
+    setSelectedTopic(null);
   };
 
-  // Calculate result statistics
-  const calculateResults = () => {
-    if (!assignment || !feedback) return null;
+  const renderModuleSelection = () => {
+    const currentSubject = subjects.find(s => s.id === selectedSubjectId);
     
-    // Get all questions that have feedback
-    const answeredQuestions = Object.keys(feedback).map(idx => parseInt(idx));
-    const totalAnswered = answeredQuestions.length;
-    
-    // Calculate overall score
-    let totalScore = 0;
-    for (const idx of answeredQuestions) {
-      totalScore += feedback[idx].score || 0;
+    if (!currentSubject) {
+      return (
+        <div style={{ textAlign: 'center', padding: '2rem' }}>
+          <p style={{ color: '#6b7280', fontSize: '1.1rem' }}>
+            Please select a subject from the header to start an assignment
+          </p>
+        </div>
+      );
     }
-    const averageScore = totalAnswered > 0 ? totalScore / totalAnswered : 0;
-    
-    // Group by topic
-    const topicPerformance = {};
-    for (const idx of answeredQuestions) {
-      const questionTopic = assignment[idx].topic;
-      if (!topicPerformance[questionTopic]) {
-        topicPerformance[questionTopic] = {
-          count: 0,
-          score: 0
-        };
-      }
-      topicPerformance[questionTopic].count++;
-      topicPerformance[questionTopic].score += feedback[idx].score || 0;
-    }
-    
-    // Calculate average per topic
-    for (const topic in topicPerformance) {
-      if (topicPerformance[topic].count > 0) {
-        topicPerformance[topic].average = 
-          topicPerformance[topic].score / topicPerformance[topic].count;
-      }
-    }
-    
-    return {
-      totalQuestions: assignment.length,
-      answeredQuestions: totalAnswered,
-      averageScore,
-      topicPerformance
-    };
-  };
 
-  // Assignment generation form with tile-based selection
-  if (!assignment) {
     return (
-      <div className="assignment-interface">
-        <ParallaxSection className="assignment-header">
-          <h2 className="text-2xl font-bold mb-4">Practice Assignments</h2>
-          <p>Complete assignments to deepen your understanding of key concepts</p>
-        </ParallaxSection>
-        
-        <Card>
-          <h2>Create Assignment</h2>
-          <p className="mb-4">Select topics and generate questions to practice</p>
-          
-          <div className="mb-4">
-            <label className="block mb-1 font-medium">Number of Questions:</label>
-            <input
-              type="number"
-              min="1"
-              max="10"
-              value={numQuestions}
-              onChange={(e) => setNumQuestions(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
-              className="w-24 p-2 border border-gray-300"
-            />
-          </div>
+      <div>
+        <h3 style={{ marginBottom: '1rem', color: '#1f2937' }}>
+          Select Module ({currentSubject.name})
+        </h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
+          {currentSubject.modules.map((module) => (
+            <div
+              key={module.id}
+              onClick={() => {
+                setSelectedModule(module);
+                setStep('topic');
+              }}
+              style={{
+                padding: '1.5rem',
+                border: '2px solid #e5e7eb',
+                borderRadius: '8px',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                backgroundColor: 'white'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = '#ca404f';
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = '#e5e7eb';
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = 'none';
+              }}
+            >
+              <h4 style={{ color: '#1f2937', marginBottom: '0.5rem' }}>{module.name}</h4>
+              <p style={{ color: '#6b7280', fontSize: '0.875rem' }}>
+                {module.topics?.length || 0} topics
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
 
-          <div className="tile-container">
-            {!selectedSubject && (
-              <>
-                <h3>Select a Subject:</h3>
-                <div className="tiles">
-                  {subjects.map((subject) => (
-                    <div
-                      key={subject.id}
-                      className="tile"
-                      onClick={() => {
-                        setSelectedSubject(subject.id);
-                        fetchModules(subject.id);
-                      }}
-                    >
-                      {subject.name}
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
+  const renderTopicSelection = () => {
+    if (!selectedModule) return null;
 
-            {selectedSubject && !selectedModule && (
-              <>
-                <h3>Select a Module:</h3>
-                <div className="tiles">
-                  {modules.map((module) => (
-                    <div
-                      key={module.id}
-                      className="tile"
-                      onClick={() => {
-                        setSelectedModule(module.id);
-                        fetchTopics(module.id);
-                      }}
-                    >
-                      {module.name}
-                    </div>
-                  ))}
-                </div>
-                <button onClick={goBack} className="btn btn-secondary">
-                  Back
-                </button>
-              </>
-            )}
+    return (
+      <div>
+        <button
+          onClick={() => {
+            setSelectedModule(null);
+            setStep('module');
+          }}
+          style={{
+            marginBottom: '1rem',
+            padding: '0.5rem 1rem',
+            backgroundColor: '#f3f4f6',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '0.875rem'
+          }}
+        >
+          ← Back to Modules
+        </button>
 
-            {selectedModule && (
-              <>
-                <h3>Select Topics:</h3>
-                <div className="tiles">
-                  {topics.map((topic) => (
-                    <div
-                      key={topic.id}
-                      className={`tile ${selectedTopics.includes(topic.id) ? 'selected' : ''}`}
-                      onClick={() => handleTopicSelect(topic)}
-                    >
-                      {selectedTopics.includes(topic.id) && (
-                        <span className="checkmark">✓</span>
-                      )}
-                      {topic.name}
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-4">
-                  <button 
-                    onClick={generateAssignment} 
-                    className="btn btn-primary" 
-                    disabled={selectedTopics.length === 0 || isSending}
-                  >
-                    {isSending ? 'Generating...' : 'Generate Assignment'}
-                  </button>
-                  <button onClick={goBack} className="btn btn-secondary ml-2">
-                    Back
-                  </button>
-                </div>
-                {isSending && (
-                  <div className="mt-4 text-center">
-                    <p>Generating your assignment, please wait...</p>
-                    <div className="loader mt-2 mx-auto"></div>
+        <h3 style={{ marginBottom: '1rem', color: '#1f2937' }}>
+          Select Topic ({selectedModule.name})
+        </h3>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+          {selectedModule.topics?.map((topic) => {
+            const mastery = Math.round((topic.bkt_score || 0) * 100);
+            const color = mastery > 80 ? '#10b981' : mastery > 60 ? '#f59e0b' : '#ef4444';
+            
+            return (
+              <div
+                key={topic.id}
+                onClick={() => setSelectedTopic(topic)}
+                style={{
+                  padding: '1.5rem',
+                  border: selectedTopic?.id === topic.id ? '2px solid #ca404f' : '2px solid #e5e7eb',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s',
+                  backgroundColor: selectedTopic?.id === topic.id ? '#fff5f7' : 'white'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#ca404f';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                  e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  if (selectedTopic?.id !== topic.id) {
+                    e.currentTarget.style.borderColor = '#e5e7eb';
+                  }
+                  e.currentTarget.style.transform = 'translateY(0)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <h4 style={{ color: '#1f2937', marginBottom: '0.75rem', fontSize: '1rem' }}>
+                  {topic.name}
+                </h4>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <div style={{ flex: 1, backgroundColor: '#e5e7eb', borderRadius: '4px', height: '8px' }}>
+                    <div 
+                      style={{ 
+                        width: `${mastery}%`, 
+                        backgroundColor: color, 
+                        height: '100%', 
+                        borderRadius: '4px',
+                        transition: 'width 0.3s'
+                      }} 
+                    />
                   </div>
-                )}
-              </>
-            )}
-          </div>
-        </Card>
-      </div>
-    );
-  }
-
-  // Loading state
-  if (isLoading) {
-    return (
-      <div className="card">
-        <div className="text-center">
-          <p>Generating your assignment...</p>
-          <div className="mt-4">
-            <div className="loader"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-  
-  // Show results summary when complete
-  if (showResults) {
-    const results = calculateResults();
-    
-    return (
-      <div className="assignment-interface">
-        <ParallaxSection className="assignment-header">
-          <h2 className="text-2xl font-bold mb-4">Assignment Results</h2>
-          <p>Review your performance and continue learning</p>
-        </ParallaxSection>
-        
-        <Card>
-          <div className="results-summary">
-            <h3 className="text-xl font-bold mb-6 text-center">Assignment Complete!</h3>
-            
-            <div className="overall-score mb-6 text-center">
-              <div className="score-circle mx-auto mb-2" style={{
-                width: '120px',
-                height: '120px',
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '28px',
-                fontWeight: 'bold',
-                background: `conic-gradient(
-                  #4CAF50 0% ${results.averageScore * 100}%, 
-                  #e0e0e0 ${results.averageScore * 100}% 100%
-                )`
-              }}>
-                <span className="bg-white rounded-full flex items-center justify-center" style={{
-                  width: '100px',
-                  height: '100px'
-                }}>
-                  {Math.round(results.averageScore * 100)}%
-                </span>
-              </div>
-              <p className="text-lg">Overall Score</p>
-            </div>
-            
-            <div className="stats-grid grid grid-cols-2 gap-4 mb-6">
-              <div className="stat-box bg-gray-100 p-3 rounded text-center">
-                <div className="text-xl font-bold">{results.answeredQuestions}/{results.totalQuestions}</div>
-                <div className="text-sm">Questions Completed</div>
-              </div>
-              
-              <div className="stat-box bg-gray-100 p-3 rounded text-center">
-                <div className="text-xl font-bold">{Object.keys(results.topicPerformance).length}</div>
-                <div className="text-sm">Topics Covered</div>
-              </div>
-            </div>
-            
-            {Object.keys(results.topicPerformance).length > 0 && (
-              <div className="topic-performance mb-6">
-                <h4 className="font-bold mb-2">Performance by Topic:</h4>
-                <div className="space-y-3">
-                  {Object.entries(results.topicPerformance).map(([topic, data]) => (
-                    <div key={topic} className="topic-score">
-                      <div className="flex justify-between mb-1">
-                        <span>{topic}</span>
-                        <span>{Math.round(data.average * 100)}%</span>
-                      </div>
-                      <div className="progress-bar bg-gray-200 rounded-full h-2.5">
-                        <div 
-                          className="h-full rounded-full bg-blue-600" 
-                          style={{width: `${data.average * 100}%`}}
-                        ></div>
-                      </div>
-                    </div>
-                  ))}
+                  <span style={{ fontSize: '0.75rem', color: '#6b7280', fontWeight: '600' }}>
+                    {mastery}%
+                  </span>
                 </div>
               </div>
-            )}
-            
-            <div className="action-buttons flex flex-col space-y-3">
-              <Button onClick={() => resetAssignment()}>Start New Assignment</Button>
-              <Button type="secondary" onClick={() => goToDashboard()}>Return to Dashboard</Button>
-            </div>
-          </div>
-        </Card>
-      </div>
-    );
-  }
+            );
+          })}
+        </div>
 
-  // Assignment question display
-  const currentQuestion = assignment[activeQuestion];
-  const hasFeedback = feedback[activeQuestion];
-
-  return (
-    <div className="assignment-interface">
-      <div className="assignment-progress mb-4">
-        <div className="flex justify-between items-center mb-2">
-          <h3 className="font-bold">Assignment Progress</h3>
-          <span>{activeQuestion + 1} of {assignment.length}</span>
-        </div>
-        <div className="progress-bar">
-          <div 
-            className="progress-fill"
-            style={{ width: `${((activeQuestion + 1) / assignment.length) * 100}%` }}
-          ></div>
-        </div>
-      </div>
-      
-      <Card>
-        <div className="topic-tag mb-2 inline-block bg-gray-100 px-2 py-1">
-          {currentQuestion.topic}
-        </div>
-        <h3 className="text-xl font-medium mb-4">{currentQuestion.question}</h3>
-        
-        <div className="mb-4">
-          <label className="block mb-2 font-medium">Your Answer:</label>
-          <textarea
-            value={answers[activeQuestion] || ''}
-            onChange={(e) => handleAnswerChange(activeQuestion, e.target.value)}
-            placeholder="Type your answer here..."
-            className="w-full p-2 border border-gray-300 h-32"
-            disabled={hasFeedback}
-          />
-        </div>
-        
-        {!hasFeedback ? (
-          <Button 
-            onClick={() => submitAnswer(activeQuestion)}
-            disabled={isSubmitting || !answers[activeQuestion]}
-          >
-            {isSubmitting ? 'Submitting...' : 'Submit Answer'}
-          </Button>
-        ) : (
-          <div className="feedback-section border-t border-gray-300 pt-4 mt-4">
-            <h4 className="font-medium mb-2">Feedback:</h4>
-            <div className="score-indicator mb-2">
-              Score: {Math.round(feedback[activeQuestion].score * 100)}%
+        {selectedTopic && (
+          <div style={{ marginTop: '1.5rem', padding: '1.5rem', backgroundColor: '#f9fafb', borderRadius: '8px' }}>
+            <h4 style={{ marginBottom: '1rem', color: '#1f2937' }}>Assignment Settings</h4>
+            <div style={{ marginBottom: '1rem' }}>
+              <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
+                Number of Questions:
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10"
+                value={numQuestions}
+                onChange={(e) => setNumQuestions(parseInt(e.target.value) || 5)}
+                style={{
+                  padding: '0.5rem',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '6px',
+                  width: '100px',
+                  fontSize: '1rem'
+                }}
+              />
             </div>
-            <p>{feedback[activeQuestion].feedback}</p>
-            
-            {feedback[activeQuestion].keyword_matches.length > 0 && (
-              <div className="mt-2">
-                <h5 className="font-medium">Key concepts covered:</h5>
-                <ul className="list-disc pl-5">
-                  {feedback[activeQuestion].keyword_matches.map((keyword, i) => (
-                    <li key={i}>{keyword}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            
-            {feedback[activeQuestion].keyword_misses.length > 0 && (
-              <div className="mt-2">
-                <h5 className="font-medium">Missing key concepts:</h5>
-                <ul className="list-disc pl-5 text-red-600">
-                  {feedback[activeQuestion].keyword_misses.map((keyword, i) => (
-                    <li key={i}>{keyword}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            <button
+              onClick={handleGenerateAssignment}
+              disabled={loading}
+              style={{
+                padding: '0.75rem 1.5rem',
+                backgroundColor: loading ? '#d1d5db' : '#ca404f',
+                color: 'white',
+                border: 'none',
+                borderRadius: '6px',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                fontSize: '1rem',
+                fontWeight: '600',
+                transition: 'background-color 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                if (!loading) e.currentTarget.style.backgroundColor = '#b0303f';
+              }}
+              onMouseLeave={(e) => {
+                if (!loading) e.currentTarget.style.backgroundColor = '#ca404f';
+              }}
+            >
+              {loading ? 'Generating Assignment...' : 'Start Assignment'}
+            </button>
           </div>
         )}
-        
-        <div className="navigation-buttons mt-6 flex justify-between">
-          <Button 
-            type="secondary" 
-            onClick={handlePrevious}
-            disabled={activeQuestion === 0}
-          >
-            Previous
-          </Button>
-          
-          {activeQuestion === assignment.length - 1 ? (
-            <Button onClick={finishAssignment} type="primary">
-              Finish Assignment
-            </Button>
-          ) : (
-            <Button 
-              onClick={handleNext}
-              disabled={activeQuestion === assignment.length - 1}
-            >
-              Next Question
-            </Button>
+      </div>
+    );
+  };
+
+  const renderAssignment = () => {
+    if (!assignment || !assignment.questions || assignment.questions.length === 0) {
+      return <div>No questions available</div>;
+    }
+
+    const currentQuestion = assignment.questions[currentQuestionIndex];
+    const userAnswer = userAnswers[currentQuestionIndex] || '';
+
+    return (
+      <div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <h3 style={{ color: '#1f2937' }}>
+            Question {currentQuestionIndex + 1} of {assignment.questions.length}
+          </h3>
+          <div style={{ fontSize: '0.875rem', color: '#6b7280' }}>
+            {selectedTopic?.name}
+          </div>
+        </div>
+
+        <div style={{ backgroundColor: '#f9fafb', padding: '1.5rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
+          <p style={{ fontSize: '1.125rem', color: '#1f2937', lineHeight: '1.6', marginBottom: '1rem' }}>
+            {currentQuestion.question}
+          </p>
+          {currentQuestion.hint && (
+            <div style={{ 
+              padding: '0.75rem', 
+              backgroundColor: '#fef3c7', 
+              borderRadius: '6px',
+              fontSize: '0.875rem',
+              color: '#92400e',
+              marginTop: '0.75rem'
+            }}>
+              💡 <strong>Hint:</strong> {currentQuestion.hint}
+            </div>
           )}
         </div>
-      </Card>
+
+        <div style={{ marginBottom: '1.5rem' }}>
+          <label style={{ display: 'block', marginBottom: '0.5rem', fontWeight: '500', color: '#374151' }}>
+            Your Answer:
+          </label>
+          <textarea
+            value={userAnswer}
+            onChange={(e) => handleAnswerChange(e.target.value)}
+            placeholder="Type your answer here..."
+            style={{
+              width: '100%',
+              minHeight: '150px',
+              padding: '1rem',
+              border: '2px solid #e5e7eb',
+              borderRadius: '8px',
+              fontSize: '1rem',
+              fontFamily: 'inherit',
+              resize: 'vertical',
+              outline: 'none'
+            }}
+            onFocus={(e) => e.currentTarget.style.borderColor = '#ca404f'}
+            onBlur={(e) => e.currentTarget.style.borderColor = '#e5e7eb'}
+          />
+          <div style={{ fontSize: '0.75rem', color: '#6b7280', marginTop: '0.5rem' }}>
+            {userAnswer.length} characters
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <button
+            onClick={handlePrevious}
+            disabled={currentQuestionIndex === 0}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: currentQuestionIndex === 0 ? '#e5e7eb' : '#f3f4f6',
+              color: currentQuestionIndex === 0 ? '#9ca3af' : '#374151',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: currentQuestionIndex === 0 ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: '600'
+            }}
+          >
+            Previous
+          </button>
+
+          <button
+            onClick={handleNext}
+            disabled={!userAnswer.trim()}
+            style={{
+              padding: '0.75rem 1.5rem',
+              backgroundColor: !userAnswer.trim() ? '#d1d5db' : '#ca404f',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: !userAnswer.trim() ? 'not-allowed' : 'pointer',
+              fontSize: '1rem',
+              fontWeight: '600',
+              transition: 'background-color 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (userAnswer.trim()) e.currentTarget.style.backgroundColor = '#b0303f';
+            }}
+            onMouseLeave={(e) => {
+              if (userAnswer.trim()) e.currentTarget.style.backgroundColor = '#ca404f';
+            }}
+          >
+            {currentQuestionIndex === assignment.questions.length - 1 ? 'Submit Assignment' : 'Next'}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const renderResults = () => {
+    return (
+      <div>
+        <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
+          <h2 style={{ color: '#1f2937', marginBottom: '1rem' }}>Assignment Submitted!</h2>
+          <div style={{ 
+            fontSize: '2.5rem', 
+            marginBottom: '0.5rem'
+          }}>
+            ✅
+          </div>
+          <p style={{ color: '#6b7280', fontSize: '1.125rem' }}>
+            Your assignment has been submitted successfully
+          </p>
+          <p style={{ color: '#9ca3af', fontSize: '0.9rem', marginTop: '0.5rem' }}>
+            Your teacher will review and grade it soon
+          </p>
+        </div>
+
+        <div style={{ marginBottom: '2rem' }}>
+          <h3 style={{ marginBottom: '1rem', color: '#1f2937' }}>Your Responses</h3>
+          {assignment.questions.map((question, index) => {
+            const userAnswer = userAnswers[index] || '';
+
+            return (
+              <div key={index} style={{ 
+                padding: '1.5rem', 
+                backgroundColor: 'white',
+                borderRadius: '8px',
+                marginBottom: '1rem',
+                border: '2px solid #e5e7eb'
+              }}>
+                <div style={{ marginBottom: '1rem' }}>
+                  <span style={{ fontWeight: '600', color: '#1f2937' }}>Q{index + 1}: </span>
+                  <span style={{ color: '#374151' }}>{question.question}</span>
+                </div>
+                
+                <div style={{ 
+                  padding: '1rem', 
+                  backgroundColor: '#f9fafb',
+                  borderRadius: '6px',
+                  fontSize: '0.9rem',
+                  color: '#374151'
+                }}>
+                  <div style={{ fontWeight: '600', marginBottom: '0.5rem', color: '#6b7280' }}>
+                    Your answer:
+                  </div>
+                  <div style={{ whiteSpace: 'pre-wrap' }}>
+                    {userAnswer || '(No answer provided)'}
+                  </div>
+                </div>
+                
+                {question.model_answer && (
+                  <div style={{ 
+                    marginTop: '0.75rem', 
+                    padding: '0.75rem', 
+                    backgroundColor: '#f0fdf4',
+                    borderRadius: '6px',
+                    fontSize: '0.875rem',
+                    color: '#166534',
+                    border: '1px solid #86efac'
+                  }}>
+                    <span style={{ fontWeight: '600' }}>Model Answer: </span>
+                    {question.model_answer}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        <button
+          onClick={handleRetakeAssignment}
+          style={{
+            padding: '0.75rem 1.5rem',
+            backgroundColor: '#ca404f',
+            color: 'white',
+            border: 'none',
+            borderRadius: '6px',
+            cursor: 'pointer',
+            fontSize: '1rem',
+            fontWeight: '600',
+            width: '100%',
+            transition: 'background-color 0.2s'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#b0303f'}
+          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ca404f'}
+        >
+          Start New Assignment
+        </button>
+      </div>
+    );
+  };
+
+  return (
+    <div className="card">
+      <h2 style={{ marginBottom: '1.5rem', color: '#1f2937' }}>Assignments</h2>
+      
+      {step === 'module' && renderModuleSelection()}
+      {step === 'topic' && renderTopicSelection()}
+      {step === 'assignment' && !showResults && renderAssignment()}
+      {showResults && renderResults()}
     </div>
   );
 };

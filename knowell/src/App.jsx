@@ -1,26 +1,79 @@
-import React from 'react';
+import React, { useContext } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthContext } from './contexts/AuthContext';
 import Login from './pages/Login';
-import TeacherHome from './pages/TeacherHome';
+import Register from './pages/Register';
 import StudentHome from './pages/StudentHome';
-// Remove the App.css import if it's causing issues
-// import './App.css'
+import TeacherHome from './pages/TeacherHome';
+
+const ProtectedRoute = ({ children, allowedRole }) => {
+  const { currentUser, loading } = useContext(AuthContext);
+  
+  if (loading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      Loading...
+    </div>;
+  }
+  
+  if (!currentUser) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (allowedRole && currentUser.role !== allowedRole) {
+    return <Navigate to={currentUser.role === 'teacher' ? '/teacher' : '/student'} replace />;
+  }
+  
+  return children;
+};
 
 function App() {
+  const { currentUser, loading } = useContext(AuthContext);
+
+  if (loading) {
+    return <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+      Loading...
+    </div>;
+  }
+
   return (
-    <AuthProvider>
-      <Router>
-        <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/teacher" element={<TeacherHome />} />
-            <Route path="/student" element={<StudentHome />} />
-          </Routes>
-        </div>
-      </Router>
-    </AuthProvider>
+    <Router>
+      <Routes>
+        <Route 
+          path="/login" 
+          element={currentUser ? <Navigate to={currentUser.role === 'teacher' ? '/teacher' : '/student'} replace /> : <Login />} 
+        />
+        <Route 
+          path="/register" 
+          element={currentUser ? <Navigate to={currentUser.role === 'teacher' ? '/teacher' : '/student'} replace /> : <Register />} 
+        />
+        <Route 
+          path="/student" 
+          element={
+            <ProtectedRoute allowedRole="student">
+              <StudentHome />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/teacher" 
+          element={
+            <ProtectedRoute allowedRole="teacher">
+              <TeacherHome />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/" 
+          element={
+            currentUser ? (
+              <Navigate to={currentUser.role === 'teacher' ? '/teacher' : '/student'} replace />
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          } 
+        />
+      </Routes>
+    </Router>
   );
 }
 

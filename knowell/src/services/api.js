@@ -23,35 +23,21 @@ api.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-export const topicsApi = {
-  getByModule: (moduleId, userId) =>
-    api.get(`/modules/${moduleId}/topics`, {
-      headers: { 'user-id': userId },
-    }),
-};
-
-export const progressApi = {
-  getProgress: (studentId) => api.get(`/student/${studentId}/progress`),
-  getBKTParams: (studentId, topicId) =>
-    api.get(`/student/${studentId}/bkt/${topicId}`), 
-};
-
-export const modulesApi = {
-  getAll: () => api.get('/subjects'),
-  getBySubject: (subjectId) => api.get(`/subjects/${subjectId}/modules`),
-};
-
 export const quizApi = {
-  generateQuiz: (data) => api.post('/generate-quiz', data),
+  // main.py expects POST /quizzes with { scope: 'topic', topic_id, student_id, num_questions }
+  generateQuiz: (data) => api.post('/quizzes', data),
+
+  // legacy endpoint kept (if still used elsewhere)
   submitAnswer: (studentId, data) => api.post(`/quiz/${studentId}/submit`, data),
-  submitQuizResponse: (data) => api.post('/submit-quiz-response', data), // New API method
+
+  // main.py submit endpoint is POST /quizzes/submit
+  submitQuizResponse: (data) => api.post('/quizzes/submit', data),
 };
 
 export const assignmentApi = {
   generateAssignment: (data) => api.post('/generate-topic-assignment', {
     subject_id: data.subject_id,
-    topic_ids: data.topic_ids,  // Changed from topics to topic_ids
-    num_questions: data.num_questions,
+    topic_ids: data.topic_ids,    num_questions: data.num_questions,
     student_id: data.student_id
   }),
   evaluateAnswer: (data) => 
@@ -71,6 +57,36 @@ export const paperApi = {
       },
     });
   },
+};
+
+export const chatWithAssistant = async (studentId, subjectId, message, studentName, conversationHistory = []) => {
+  try {
+    const response = await fetch(`${API_URL}/chat`, {  // Changed from API_BASE_URL to API_URL
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        student_id: studentId,
+        subject_id: subjectId,
+        message: message,
+        student_name: studentName,
+        conversation_history: conversationHistory
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('API Error Response:', errorText);
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error('Error chatting with assistant:', error);
+    throw error;
+  }
 };
 
 export default api;
