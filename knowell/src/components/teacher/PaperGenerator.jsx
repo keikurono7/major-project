@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { paperApi, topicsApi } from '../../services/api';
+import { paperApi } from '../../services/api';
 import ParallaxSection from '../common/ParallaxSection';
 import Card from '../common/Card';
 import Button from '../common/Button';

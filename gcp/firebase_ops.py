@@ -256,20 +256,19 @@ def update_student_bkt_params(student_id: str, topic_id: str, bkt_params: Dict[s
     """
     Update Bayesian Knowledge Tracing parameters for a student on a specific topic.
     Stores data directly in the users/{student_id} document.
-    
-    Args:
-        student_id: ID of the student
-        topic_id: ID of the topic
-        bkt_params: Dictionary containing BKT parameters
     """
     try:
         if not db:
             print(f"⚠️ Firebase unavailable, cannot update BKT params for {student_id} on {topic_id}")
             return
-        
-        # Add timestamp to track when the parameters were last updated
-        bkt_params["last_updated"] = firestore.SERVER_TIMESTAMP
-        
+
+        server_ts = firestore.SERVER_TIMESTAMP
+        local_iso_ts = datetime.utcnow().isoformat()
+
+        # Copy for DB, use sentinel for last_updated
+        bkt_params_for_db = dict(bkt_params)
+        bkt_params_for_db["last_updated"] = server_ts
+
         # Find the subject/module that contains this topic
         subjects = get_all_subjects()
         topic_path_found = False
@@ -290,16 +289,16 @@ def update_student_bkt_params(student_id: str, topic_id: str, bkt_params: Dict[s
                         # Set the mastery data path
                         mastery_path = f"mastery.subjects.{subject_id}.modules.{module_id}.topics.{topic_id}"
                         
-                        # Prepare update data
+                        # Prepare update data (use server_ts for Firestore)
                         update_data = {
-                            f"{mastery_path}.p_L": bkt_params.get("p_L", 0.0),
-                            f"{mastery_path}.p_L0": bkt_params.get("p_L0", 0.0),
-                            f"{mastery_path}.p_T": bkt_params.get("p_T", 0.1),
-                            f"{mastery_path}.p_G": bkt_params.get("p_G", 0.2),
-                            f"{mastery_path}.p_S": bkt_params.get("p_S", 0.1),
-                            f"{mastery_path}.attempts": bkt_params.get("attempts", 0) + 1,
-                            f"{mastery_path}.correct": bkt_params.get("correct", 0) + (1 if bkt_params.get("is_correct", False) else 0),
-                            f"{mastery_path}.last_updated": firestore.SERVER_TIMESTAMP,
+                            f"{mastery_path}.p_L": bkt_params_for_db.get("p_L", 0.0),
+                            f"{mastery_path}.p_L0": bkt_params_for_db.get("p_L0", 0.0),
+                            f"{mastery_path}.p_T": bkt_params_for_db.get("p_T", 0.1),
+                            f"{mastery_path}.p_G": bkt_params_for_db.get("p_G", 0.2),
+                            f"{mastery_path}.p_S": bkt_params_for_db.get("p_S", 0.1),
+                            f"{mastery_path}.attempts": bkt_params_for_db.get("attempts", 0),
+                            f"{mastery_path}.correct": bkt_params_for_db.get("correct", 0) + (1 if bkt_params_for_db.get("is_correct", False) else 0),
+                            f"{mastery_path}.last_updated": server_ts,
                             f"{mastery_path}.topic_name": topic.get("name", ""),
                             f"{mastery_path}.subject_name": subject.get("name", ""),
                             f"{mastery_path}.module_name": module.get("name", "")
@@ -308,14 +307,14 @@ def update_student_bkt_params(student_id: str, topic_id: str, bkt_params: Dict[s
                         # Update user document directly
                         user_ref.update(update_data)
                         
-                        # Also add a summary for quick access
+                        # Also add a summary for quick access (use server timestamp in DB)
                         user_ref.update({
                             f"mastery_summary.{subject_id}.{topic_id}": {
-                                "mastery": bkt_params.get("p_L", 0.0),
+                                "mastery": bkt_params_for_db.get("p_L", 0.0),
                                 "topic_name": topic.get("name", ""),
                                 "module_name": module.get("name", ""),
                                 "subject_name": subject.get("name", ""),
-                                "last_updated": firestore.SERVER_TIMESTAMP
+                                "last_updated": server_ts
                             }
                         })
                         
@@ -330,14 +329,17 @@ def update_student_bkt_params(student_id: str, topic_id: str, bkt_params: Dict[s
         
         if not topic_path_found:
             print(f"⚠️ Could not find topic path for {topic_id}, saving direct reference only")
-            # Save in the user document with minimal info
+            # Save in the user document with minimal info (use server timestamp)
             user_ref = db.collection('users').document(student_id)
             user_ref.update({
-                f"mastery.unknown_topics.{topic_id}": bkt_params
+                f"mastery.unknown_topics.{topic_id}": { **bkt_params_for_db }
             })
             
-        print(f"✅ Successfully updated BKT parameters for {student_id} on {topic_id}")
-        
+        # Log a JSON-friendly copy (replace sentinel with local ISO)
+        bkt_params_for_log = dict(bkt_params)
+        bkt_params_for_log["last_updated"] = local_iso_ts
+        print(f"✅ Successfully updated BKT parameters for {student_id} on {topic_id}: {bkt_params_for_log}")
+
     except Exception as e:
         print(f"❌ Error updating BKT parameters: {e}")
         import traceback
@@ -437,54 +439,38 @@ def get_module_topics(subject_id, module_id):
         print(f"Error retrieving topics for module {module_id} in subject {subject_id}: {e}")
         return []
 
-# Deprecated: quiz generation does not belong in firebase_ops
-def generate_quiz_for_topic(student_id, topic_id, num_questions=5):
-    raise NotImplementedError(
-        "Quiz generation has moved to quiz_generator. "
-        "Use quiz_generator.generate_topic_quiz from main.py after retrieving subject/module/topic via firebase_ops."
-    )
-
 def update_student_topic_response(student_id, topic_id, is_correct):
     """
     Update BKT parameters based on student's response to a question.
-    
-    Args:
-        student_id: ID of the student
-        topic_id: ID of the topic
-        is_correct: Whether the student's response was correct
-        
-    Returns:
-        Updated BKT parameters
+    Returns a JSON-friendly updated params dict.
     """
     try:
         # Get current BKT parameters
         bkt_params = get_student_bkt_params(student_id, topic_id)
-        
-        # Update mastery probability using BKT update rule
-        p_L = bkt_params.get("p_L", 0.0)  # Current mastery probability
-        p_T = bkt_params.get("p_T", 0.1)  # Learning probability
-        p_G = bkt_params.get("p_G", 0.2)  # Guess probability
-        p_S = bkt_params.get("p_S", 0.1)  # Slip probability
-        
+
+        # Current params
+        p_L = bkt_params.get("p_L", 0.0)
+        p_T = bkt_params.get("p_T", 0.1)
+        p_G = bkt_params.get("p_G", 0.2)
+        p_S = bkt_params.get("p_S", 0.1)
+
+        # Safe Bayesian update with fallbacks
         if is_correct:
-            # P(L|correct) = P(correct|L)P(L) / P(correct)
-            # P(correct) = P(correct|L)P(L) + P(correct|~L)P(~L)
             p_correct_given_L = 1 - p_S
             p_correct_given_not_L = p_G
             p_correct = p_correct_given_L * p_L + p_correct_given_not_L * (1 - p_L)
-            p_L_new = (p_correct_given_L * p_L) / p_correct
+            p_L_new = (p_correct_given_L * p_L) / p_correct if p_correct > 0 else p_L
         else:
-            # P(L|incorrect) = P(incorrect|L)P(L) / P(incorrect)
-            # P(incorrect) = P(incorrect|L)P(L) + P(incorrect|~L)P(~L)
             p_incorrect_given_L = p_S
             p_incorrect_given_not_L = 1 - p_G
             p_incorrect = p_incorrect_given_L * p_L + p_incorrect_given_not_L * (1 - p_L)
-            p_L_new = (p_incorrect_given_L * p_L) / p_incorrect
-        
+            p_L_new = (p_incorrect_given_L * p_L) / p_incorrect if p_incorrect > 0 else p_L
+
         # Apply learning effect
         p_L_final = p_L_new + (1 - p_L_new) * p_T
-        
-        # Update BKT parameters
+
+        # Prepare updated params for return (use ISO timestamp so it's JSON-serializable)
+        local_iso_ts = datetime.utcnow().isoformat()
         updated_params = {
             "p_L0": bkt_params.get("p_L0", 0.0),
             "p_T": p_T,
@@ -493,14 +479,17 @@ def update_student_topic_response(student_id, topic_id, is_correct):
             "p_L": p_L_final,
             "mastery_probability": p_L_final,
             "learning_rate": p_T,
-            "last_updated": firestore.SERVER_TIMESTAMP
+            "last_updated": local_iso_ts
         }
-        
-        # Save updated parameters
+
+        # Persist updated params to Firestore (this will write server timestamp internally)
         update_student_bkt_params(student_id, topic_id, updated_params)
-        
+
+        # Return JSON-safe updated params
         return updated_params
-        
+
     except Exception as e:
         print(f"Error updating BKT parameters for student {student_id}, topic {topic_id}: {e}")
+        import traceback
+        traceback.print_exc()
         return None
