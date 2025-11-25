@@ -10,7 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@firebase/app": "^0.14.5",
+    "@firebase/firestore": "^4.9.2",
+    "@firebase/storage": "^0.14.0",
     "axios": "^1.12.0",
+    "firebase": "^12.5.0",
     "lucide-react": "^0.543.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",

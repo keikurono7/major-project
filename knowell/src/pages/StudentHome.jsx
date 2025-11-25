@@ -5,6 +5,7 @@ import Navbar from '../components/common/Navbar';
 import Sidebar from '../components/common/Sidebar';
 import QuizInterface from '../components/student/QuizInterface';
 import AssignmentInterface from '../components/student/AssignmentInterface';
+import ProjectsFeed from '../components/student/ProjectsFeed';
 import { computeAllSubjectsProgress } from '../services/progress';
 import { chatWithAssistant } from '../services/api';
 import '../dashboard.css';
@@ -14,10 +15,6 @@ const StudentHome = () => {
   const [topics, setTopics] = useState([]);
   const [subjectsData, setSubjectsData] = useState([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState(localStorage.getItem('currentSubjectId') || null);
-  const [progress, setProgress] = useState({
-    confidence_scores: {}
-  });
-  const [activeTab, setActiveTab] = useState('dashboard');
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   
   // Chat states
@@ -92,12 +89,16 @@ const StudentHome = () => {
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'projects', label: 'Projects', icon: '🗂️' },
     { id: 'quizzes', label: 'Take Quiz', icon: '❓' },
     { id: 'assignments', label: 'Assignments', icon: '📝' },
     { id: 'papers', label: 'Question Papers', icon: '📚' },
     { id: 'profile', label: 'Profile', icon: '👤' }
   ];
 
+  // active tab state required by renderContent and Sidebar
+  const [activeTab, setActiveTab] = useState('dashboard');
+  
   // Helper function to generate YouTube search query
   const getYouTubeSearchUrl = (topicName, subjectName) => {
     const query = encodeURIComponent(`${subjectName} ${topicName} tutorial`);
@@ -601,6 +602,9 @@ const StudentHome = () => {
       case 'quizzes':
         return <QuizInterface studentId={currentUser.id} />;
 
+      case 'projects':
+        return <ProjectsFeed studentId={currentUser.id} />;
+
       case 'assignments':
         return <AssignmentInterface studentId={currentUser.id} />;
 
@@ -657,18 +661,15 @@ const StudentHome = () => {
     }
   };
 
+  // minimal render: provide sidebarItems so Sidebar.map won't fail
   return (
-    <div className="page">
-      <Navbar user={currentUser} />
-      <div className="dashboard">
-        <Sidebar 
-          items={sidebarItems}
-          activeItem={activeTab}
-          onItemClick={setActiveTab}
-        />
-        <div className="main-content">
+    <div className="flex min-h-screen">
+      <Sidebar items={sidebarItems} activeItem={activeTab} onItemClick={setActiveTab} />
+      <div className="flex-1">
+        <Navbar user={currentUser} />
+        <main className="flex-1 bg-gray-100 p-6">
           {renderContent()}
-        </div>
+        </main>
       </div>
     </div>
   );

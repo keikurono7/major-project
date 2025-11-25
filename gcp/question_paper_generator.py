@@ -3,14 +3,17 @@
 import os
 import re
 import random
+import json
+import requests
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from langchain_ollama import OllamaLLM
 
 # Configuration
 OUTPUT_DIR = "./question_papers"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 OLLAMA_MODEL = "phi3:mini"
+OLLAMA_URL = "http://localhost:11434"  # adjust if different
 
 def clean_ocr_text(raw_text: str) -> str:
     # (This function remains the same)
@@ -94,6 +97,71 @@ def add_marking_variety(paper_content: str) -> str:
             new_content = new_content.replace('(10 Marks)', f'({dist[1]} Marks)', 1)
             
     return new_content
+
+def _call_ollama(prompt: str, max_tokens: int = 1000) -> str:
+    payload = {
+        "model": OLLAMA_MODEL,
+        "prompt": prompt,
+        "max_tokens": max_tokens,
+        "temperature": 0.2
+    }
+    resp = requests.post(OLLAMA_URL, json=payload, timeout=120)
+    resp.raise_for_status()
+    data = resp.json()
+    # depends on Ollama response format — try to extract text field
+    # adjust keys if your Ollama returns different structure
+    return data.get("text") or data.get("output") or json.dumps(data)
+
+def generate_questions_from_text(text: str, max_questions: int = 50) -> List[Dict]:
+    prompt = f"""
+You are a question generator. Given the following source text, generate up to {max_questions} candidate exam questions.
+Return output as JSON array of objects with keys: text, type, default_marks, difficulty, notes.
+Source text:
+\"\"\"{text[:20000]}\"\"\"  # truncate if extremely long
+Instructions:
+- Produce many short clear questions, variety of types (MCQ, short answer, long answer).
+- For MCQs include options field (array) and indicate correct_index.
+- For each question include default_marks (suggested).
+Return ONLY valid JSON.
+"""
+    out = _call_ollama(prompt, max_tokens=2000)
+    try:
+        # ensure JSON; Ollama may return raw text — attempt to parse
+        questions = json.loads(out)
+        return questions
+    except Exception:
+        # fallback: try to extract JSON substring
+        # simple heuristic: find first '[' and last ']'
+        try:
+            start = out.index('[')
+            end = out.rindex(']') + 1
+            return json.loads(out[start:end])
+        except Exception as e:
+            raise RuntimeError("Failed to parse Ollama response: " + str(e))
+
+def finalize_questions_with_ollama(selected_questions: List[Dict], max_marks: int = 100) -> List[Dict]:
+    # Send selected questions and desired total max marks; task the model to pick a final set
+    payload_json = json.dumps(selected_questions, ensure_ascii=False)
+    prompt = f"""
+You are an exam composer tool. You are given candidate questions (JSON array). Choose a subset or adjust marks so that the total marks equal {max_marks} (or as close as possible without exceeding).
+Input questions:
+{payload_json}
+Instructions:
+- Return a JSON array of final question objects with keys: text, marks, type, notes.
+- Do not include any explanatory text.
+"""
+    out = _call_ollama(prompt, max_tokens=1000)
+    try:
+        final = json.loads(out)
+        return final
+    except Exception:
+        # attempt heuristics as above
+        try:
+            start = out.index('[')
+            end = out.rindex(']') + 1
+            return json.loads(out[start:end])
+        except Exception as e:
+            raise RuntimeError("Failed to parse Ollama response: " + str(e))
 
 def generate_question_paper(
     subject_data: Dict[str, Any], 

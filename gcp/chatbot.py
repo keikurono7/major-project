@@ -242,8 +242,6 @@ def chat_with_ollama(
     except requests.exceptions.RequestException as e:
         error_msg = f"Ollama API error: {str(e)}"
         print(error_msg)
-        import traceback
-        traceback.print_exc()
         return {
             "response": "I'm having trouble connecting to my AI service. Please try again in a moment.",
             "error": error_msg,
@@ -259,4 +257,250 @@ def chat_with_ollama(
             "response": "An unexpected error occurred. Please try again.",
             "error": error_msg,
             "knowledge_context": []
+        }
+
+
+def get_teacher_bkt_insights(teacher_id, subject_id, bkt_data, total_students, subject_name):
+    """
+    Generate AI-powered insights for teacher analytics based on BKT data.
+    
+    Args:
+        teacher_id (str): Teacher's ID
+        subject_id (str): Subject ID
+        bkt_data (dict): Raw BKT data with topic scores
+        total_students (int): Total number of students
+        subject_name (str): Name of the subject
+    
+    Returns:
+        dict: Insights including key findings, recommendations, and interventions
+    """
+    try:
+        print(f"Generating BKT insights for teacher {teacher_id}, subject {subject_name}")
+        
+        # Format BKT data for the prompt
+        formatted_bkt = []
+        for topic_id, topic_data in bkt_data.items():
+            if topic_data.get('scores'):
+                avg_score = sum(topic_data['scores']) / len(topic_data['scores'])
+                
+                formatted_bkt.append({
+                    'topic': topic_data.get('topicName', 'Unknown'),
+                    'avg_mastery': round(avg_score * 100, 1),  # Round to 1 decimal
+                    'students': len(topic_data['scores'])
+                })
+        
+        print(f"Formatted {len(formatted_bkt)} topics for analysis")
+        
+        # SIMPLIFIED PROMPT - much shorter and clearer
+        prompt = f"""Analyze this class performance data for {subject_name}:
+
+Class: {total_students} students, {len(formatted_bkt)} topics
+
+Topic Performance:
+"""
+        
+        for item in formatted_bkt:
+            prompt += f"- {item['topic']}: {item['avg_mastery']}% average ({item['students']} students)\n"
+        
+        prompt += """
+
+Provide brief insights:
+1. Overall class performance (1 sentence)
+2. Best performing topics
+3. Topics needing help
+4. 2-3 teaching recommendations
+
+Keep it concise and actionable."""
+        
+        print(f"Simplified prompt length: {len(prompt)} characters")
+        print(f"Prompt preview: {prompt[:300]}...")
+        
+        # Call Ollama with SIMPLIFIED options
+        payload = {
+            "model": OLLAMA_MODEL,
+            "prompt": prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.1,  # Very low for consistent responses
+                "top_p": 0.7,        # Lower for more focused
+                "num_predict": 300,  # Shorter responses
+                "stop": ["\n\n", "###"]  # Simple stop conditions
+            }
+        }
+        
+        print(f"Calling Ollama with simplified payload")
+        response = requests.post(OLLAMA_API_URL, json=payload, timeout=30)  # Shorter timeout
+        response.raise_for_status()
+        
+        result = response.json()
+        insights = result.get('response', '').strip()
+        
+        print(f"Ollama response received, length: {len(insights)}")
+        print(f"Raw result keys: {list(result.keys())}")
+        
+        if 'error' in result:
+            print(f"Ollama returned error: {result['error']}")
+            return {
+                "status": "error",
+                "error": f"Ollama error: {result['error']}",
+                "insights": "AI service returned an error. Please try again."
+            }
+        
+        if not insights:
+            print("Empty insights response")
+            return {
+                "status": "error",
+                "error": "Empty response from AI",
+                "insights": "Unable to generate insights. Please try again."
+            }
+        
+        print(f"Success! Insights: {insights}...")
+        
+        return {
+            "status": "success",
+            "insights": insights,
+            "bkt_summary": {
+                "total_topics": len(formatted_bkt),
+                "avg_class_mastery": round(sum([t['avg_mastery'] for t in formatted_bkt]) / len(formatted_bkt), 1) if formatted_bkt else 0,
+                "topics_below_60": len([t for t in formatted_bkt if t['avg_mastery'] < 60]),
+                "topics_above_85": len([t for t in formatted_bkt if t['avg_mastery'] > 85])
+            }
+        }
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Ollama API error: {str(e)}"
+        print(error_msg)
+        return {
+            "status": "error",
+            "error": error_msg,
+            "insights": "Unable to connect to AI service. Please check if Ollama is running."
+        }
+    
+    except Exception as e:
+        error_msg = f"Error generating BKT insights: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return {
+            "status": "error",
+            "error": str(e),
+            "insights": "Unable to generate insights"
+        }
+
+
+def chat_with_teacher_assistant(teacher_id, subject_id, message, bkt_context=None, conversation_history=None):
+    """
+    Chat endpoint for teachers to discuss class performance and get recommendations.
+    
+    Args:
+        teacher_id (str): Teacher's ID
+        subject_id (str): Subject ID
+        message (str): Teacher's question/message
+        bkt_context (dict): Optional BKT data for context
+        conversation_history (list): List of previous messages
+    
+    Returns:
+        dict: Response from the AI assistant
+    """
+    try:
+        print(f"Teacher chat request: {message[:50]}...")
+        
+        if not message or not isinstance(message, str):
+            return {
+                "status": "error",
+                "error": "Invalid message",
+                "response": "Please provide a valid message"
+            }
+        
+        # Build context from BKT data if available
+        context = ""
+        if bkt_context:
+            context = "\n\nClass Performance Context:\n"
+            for topic_id, topic_data in bkt_context.items():
+                if topic_data.get('scores'):
+                    avg_score = sum(topic_data['scores']) / len(topic_data['scores'])
+                    context += f"- {topic_data.get('topicName', 'Unknown')}: {round(avg_score * 100, 2)}% mastery\n"
+        
+        # Build conversation history
+        history_text = ""
+        if conversation_history and len(conversation_history) > 0:
+            history_text = "\n\nConversation History:\n"
+            for msg in conversation_history[-6:]:  # Keep last 6 messages for context
+                role = "Teacher" if msg.get('role') == 'user' else "Assistant"
+                history_text += f"{role}: {msg.get('content', '')}\n"
+        
+        # Build the prompt
+        system_prompt = """You are an experienced educational AI assistant for teachers. You help teachers:
+- Interpret student BKT (Bayesian Knowledge Tracing) data
+- Develop targeted interventions
+- Improve student learning outcomes
+- Design differentiated instruction strategies
+- Track progress and identify patterns
+
+Be supportive, evidence-based, and practical in your recommendations."""
+        
+        full_prompt = f"""{system_prompt}{context}{history_text}
+
+Teacher's Question: {message}
+
+Provide a helpful, specific response that:
+1. Answers the teacher's question directly
+2. References the class performance data if relevant
+3. Offers actionable suggestions
+4. Is concise but comprehensive"""
+        
+        print(f"Calling Ollama API for teacher chat")
+        
+        # Call Ollama LLM using same config as student chat
+        payload = {
+            "model": OLLAMA_MODEL,
+            "prompt": full_prompt,
+            "stream": False,
+            "options": {
+                "temperature": 0.3,  # Slightly higher for conversational responses
+                "top_p": 0.8,
+                "num_predict": 400,  # Medium length for teacher chat
+                "stop": ["\n\n", "Teacher:", "Assistant:"]  # Stop at double newline or role markers
+            }
+        }
+        
+        response = requests.post(OLLAMA_API_URL, json=payload, timeout=60)
+        response.raise_for_status()  # This will raise an exception if status is not 2xx
+        
+        result = response.json()
+        assistant_response = result.get('response', '').strip()
+        
+        print(f"Teacher chat response received, length: {len(assistant_response)}")
+        
+        if not assistant_response:
+            return {
+                "status": "error",
+                "error": "Empty response from LLM",
+                "response": "I'm having trouble processing your request. Please try again."
+            }
+        
+        return {
+            "status": "success",
+            "response": assistant_response,
+            "message": assistant_response
+        }
+    
+    except requests.exceptions.RequestException as e:
+        error_msg = f"Ollama API error: {str(e)}"
+        print(error_msg)
+        return {
+            "status": "error",
+            "error": error_msg,
+            "response": "Unable to connect to AI service. Please check if Ollama is running."
+        }
+    
+    except Exception as e:
+        error_msg = f"Error in teacher assistant chat: {str(e)}"
+        print(error_msg)
+        import traceback
+        traceback.print_exc()
+        return {
+            "status": "error",
+            "error": str(e),
+            "response": "An error occurred. Please try again."
         }

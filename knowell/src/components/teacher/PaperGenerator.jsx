@@ -3,6 +3,10 @@ import { paperApi } from '../../services/api';
 import ParallaxSection from '../common/ParallaxSection';
 import Card from '../common/Card';
 import Button from '../common/Button';
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+import { generateQuestions, finalizeQuestions } from "../../services/api";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 const PaperGenerator = () => {
   const [topics, setTopics] = useState([]);
@@ -11,6 +15,11 @@ const PaperGenerator = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedPapers, setGeneratedPapers] = useState([]);
   const [latestPaperUrl, setLatestPaperUrl] = useState('');
+  const [fileText, setFileText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [generated, setGenerated] = useState([]);
+  const [selected, setSelected] = useState({});
+  const [maxMarks, setMaxMarks] = useState(100);
   
   // Fetch available topics and previous papers
   useEffect(() => {
@@ -74,6 +83,80 @@ const PaperGenerator = () => {
     }
   };
   
+  async function extractTextFromPdf(file) {
+    const arrayBuffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let fullText = "";
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      const pageText = content.items.map(i => i.str).join(" ");
+      fullText += "\n\n" + pageText;
+    }
+    return fullText;
+  }
+
+  async function handleUpload(e) {
+    const f = e.target.files[0];
+    if (!f) return;
+    setLoading(true);
+    try {
+      const text = await extractTextFromPdf(f);
+      setFileText(text);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to read PDF");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleGenerate() {
+    if (!fileText) return alert("Upload a PDF first");
+    setLoading(true);
+    try {
+      // ask backend to generate many questions from full text
+      const resp = await generateQuestions({ text: fileText, maxQuestions: 50 });
+      setGenerated(resp.questions || []);
+      // init default marks & selection
+      const sel = {};
+      resp.questions?.forEach((q, idx) => (sel[idx] = { selected: true, marks: q.default_marks || 2 }));
+      setSelected(sel);
+    } catch (err) {
+      console.error(err);
+      alert("Generation failed: " + (err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function toggleQuestion(i) {
+    setSelected(s => ({ ...s, [i]: { ...s[i], selected: !s[i].selected } }));
+  }
+
+  function setMarks(i, m) {
+    setSelected(s => ({ ...s, [i]: { ...s[i], marks: Number(m) } }));
+  }
+
+  async function handleFinalize() {
+    const chosen = generated
+      .map((q, i) => ({ index: i, question: q, ...selected[i] }))
+      .filter(item => item.selected);
+    if (!chosen.length) return alert("Select at least one question");
+    setLoading(true);
+    try {
+      const resp = await finalizeQuestions({ selectedQuestions: chosen, maxMarks });
+      // backend returns final paper or chosenQuestions
+      alert("Finalized. Preview returned from server.");
+      console.log("finalized:", resp);
+    } catch (err) {
+      console.error(err);
+      alert("Finalize failed: " + (err.message || err));
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <div className="paper-generator p-6">
       <div className="max-w-7xl mx-auto">
@@ -182,6 +265,33 @@ const PaperGenerator = () => {
               )}
             </div>
           </Card>
+        </div>
+
+        <div className="mt-6">
+          <h3 className="font-medium">Generated Questions ({generated.length})</h3>
+          <div className="space-y-3 mt-3">
+            {generated.map((q, i) => (
+              <div key={i} className="p-2 border rounded">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <input type="checkbox" checked={!!selected[i]?.selected} onChange={() => toggleQuestion(i)} />
+                    <strong className="ml-2">Q{i + 1}:</strong>
+                    <span className="ml-2">{q.text}</span>
+                  </div>
+                  <div className="ml-4">
+                    <label>Marks</label>
+                    <input type="number" value={selected[i]?.marks || q.default_marks || 2} onChange={(e) => setMarks(i, e.target.value)} className="ml-2 w-20" />
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            <label>Max total marks</label>
+            <input type="number" value={maxMarks} onChange={(e) => setMaxMarks(Number(e.target.value))} className="ml-2 w-28" />
+            <button onClick={handleFinalize} className="btn ml-4" disabled={loading}>Finalize</button>
+          </div>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import os
+import os, json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from fastapi import (
@@ -19,7 +19,7 @@ from quiz_generator import generate_topic_quiz, generate_quiz_for_topic, evaluat
 from assignment_generator import generate_topic_assignment, evaluate_assignment_answer, generate_feedback
 from question_paper_generator import generate_question_paper, save_question_paper
 from auth import User, UserCreate, authenticate_user, create_firebase_user
-from chatbot import chat_with_ollama
+from chatbot import chat_with_ollama, get_teacher_bkt_insights, chat_with_teacher_assistant
 
 # --- App Initialization ---
 app = FastAPI(title="AI-Powered Education Platform API")
@@ -331,6 +331,61 @@ async def chat_assistant(req: ChatRequest):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
+
+@app.post("/teacher-analytics/insights")
+async def get_bkt_insights(request: dict):
+    """
+    Get AI-powered insights on class BKT performance
+    """
+    teacher_id = request.get('teacher_id')
+    subject_id = request.get('subject_id')
+    bkt_data = request.get('bkt_data')
+    total_students = request.get('total_students')
+    subject_name = request.get('subject_name')
+    
+    if not all([teacher_id, subject_id, bkt_data, subject_name]):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
+    result = get_teacher_bkt_insights(
+        teacher_id=teacher_id,
+        subject_id=subject_id,
+        bkt_data=bkt_data,
+        total_students=total_students,
+        subject_name=subject_name
+    )
+    
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to generate insights'))
+    
+    return result
+
+
+@app.post("/teacher-analytics/chat")
+async def chat_with_teacher_assistant_endpoint(request: dict):
+    """
+    Chat with AI assistant about class performance
+    """
+    teacher_id = request.get('teacher_id')
+    subject_id = request.get('subject_id')
+    message = request.get('message')
+    bkt_context = request.get('bkt_context')
+    history = request.get('conversation_history', [])
+    
+    if not all([teacher_id, subject_id, message]):
+        raise HTTPException(status_code=400, detail="Missing required fields")
+    
+    result = chat_with_teacher_assistant(
+        teacher_id=teacher_id,
+        subject_id=subject_id,
+        message=message,
+        bkt_context=bkt_context,
+        conversation_history=history
+    )
+    
+    if result.get('status') == 'error':
+        raise HTTPException(status_code=500, detail=result.get('error', 'Failed to process message'))
+    
+    return result
 
 @app.get("/health")
 async def health():
