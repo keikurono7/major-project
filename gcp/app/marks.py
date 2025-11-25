@@ -4,13 +4,13 @@ import logging
 import uuid
 from datetime import datetime
 
-from app.models import (
+from .models import (
     StudentMark, IAMarkEntry, SemesterExamMark, 
     QuestionTopicMapping, VTUFetchRequest, ERPFetchRequest
 )
-from app.firebase import firebase_client
-from app.ollama import ollama_client
-from app.intelligence import schedule_intelligence
+from .firebase import firebase_client
+from .ollama import ollama_client
+from .intelligence import schedule_intelligence
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

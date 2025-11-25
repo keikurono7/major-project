@@ -2,185 +2,299 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from typing import List, Dict, Any
 import logging
 import uuid
-import json
 from datetime import datetime
 import PyPDF2
-import docx
 import io
 
-from app.firebase import firebase_client
-from app.gemini import gemini_client
+from .models import Syllabus, SyllabusAnalysis
+from .firebase import firebase_client
+from .ollama import ollama_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-async def extract_text_from_file(file: UploadFile) -> str:
-    """Extract text from various file formats"""
-    content = await file.read()
-    
-    if file.filename.endswith('.pdf'):
-        pdf_reader = PyPDF2.PdfReader(io.BytesIO(content))
-        text = ""
-        for page in pdf_reader.pages:
-            text += page.extract_text()
-        return text
-    
-    elif file.filename.endswith('.docx'):
-        doc = docx.Document(io.BytesIO(content))
-        text = "\n".join([paragraph.text for paragraph in doc.paragraphs])
-        return text
-    
-    elif file.filename.endswith('.txt'):
-        return content.decode('utf-8')
-    
-    else:
-        raise ValueError("Unsupported file format. Use PDF, DOCX, or TXT")
-
-
 @router.post("/upload")
-async def upload_syllabus(file: UploadFile = File(...)):
-    """Upload and parse syllabus document"""
+async def upload_syllabus(file: UploadFile = File(...), subject_id: str = None):
+    """Upload and parse syllabus PDF using Ollama"""
     try:
-        syllabus_id = str(uuid.uuid4())
+        # Read PDF content
+        pdf_content = await file.read()
+        pdf_reader = PyPDF2.PdfReader(io.BytesIO(pdf_content))
         
-        # Extract text from file
-        raw_text = await extract_text_from_file(file)
+        # Extract text from all pages
+        full_text = ""
+        for page in pdf_reader.pages:
+            full_text += page.extract_text() + "\n"
         
-        # Parse syllabus using AI
-        prompt = f"""
-        Parse this syllabus document and extract structured information:
+        if not full_text.strip():
+            raise HTTPException(status_code=400, detail="Could not extract text from PDF")
         
-        {raw_text}
+        # Generate subject_id if not provided
+        if not subject_id:
+            subject_id = str(uuid.uuid4())
         
-        Extract and return JSON with:
-        {{
-            "course_name": "course name",
-            "course_code": "code",
-            "credits": number,
-            "prerequisites": ["list"],
-            "units": [
-                {{
-                    "unit_number": 1,
-                    "title": "unit title",
-                    "topics": ["topic1", "topic2"],
-                    "hours": number,
-                    "learning_outcomes": ["outcome1"]
-                }}
-            ],
-            "textbooks": ["book1", "book2"],
-            "reference_books": ["ref1"],
-            "evaluation_scheme": {{
-                "internal": 40,
-                "external": 60
-            }}
-        }}
-        """
+        # Parse syllabus using Ollama
+        prompt = f"""Analyze this course syllabus and extract structured information:
+
+Syllabus Content:
+{full_text}
+
+Extract and return in JSON format:
+{{
+  "subject_name": "Course name",
+  "subject_code": "Course code",
+  "credits": 4,
+  "modules": [
+    {{
+      "module_number": 1,
+      "module_name": "Module name",
+      "topics": ["Topic 1", "Topic 2", ...],
+      "learning_outcomes": ["Outcome 1", "Outcome 2", ...],
+      "hours": 8
+    }}
+  ],
+  "textbooks": [
+    {{
+      "title": "Book title",
+      "authors": ["Author 1"],
+      "edition": "1st"
+    }}
+  ],
+  "reference_books": [...],
+  "assessment_scheme": {{
+    "ia_tests": 50,
+    "semester_exam": 100,
+    "assignments": 0,
+    "projects": 0
+  }},
+  "total_hours": 40
+}}"""
+
+        # Analyze using Ollama
+        response = await ollama_client.generate(
+            prompt,
+            system="You are an expert at analyzing educational syllabi. Extract structured information accurately."
+        )
         
-        parsed_content = gemini_client.generate_content(prompt)
-        if not parsed_content:
-            raise HTTPException(status_code=500, detail="Failed to parse syllabus")
+        # Parse response
+        import json
+        try:
+            response_text = response.strip()
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0]
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0]
+            
+            analysis = json.loads(response_text)
+        except Exception as e:
+            logger.error(f"Error parsing syllabus analysis: {e}")
+            # Fallback: save raw text
+            analysis = {
+                "subject_name": file.filename.replace(".pdf", ""),
+                "content": full_text,
+                "modules": []
+            }
         
-        # Parse JSON
-        syllabus_data = json.loads(parsed_content)
+        # Create syllabus object
+        syllabus = Syllabus(
+            subject_id=subject_id,
+            subject_name=analysis.get("subject_name", file.filename),
+            subject_code=analysis.get("subject_code", ""),
+            content=full_text,
+            modules=analysis.get("modules", []),
+            textbooks=analysis.get("textbooks", []),
+            reference_books=analysis.get("reference_books", []),
+            assessment_scheme=analysis.get("assessment_scheme", {}),
+            total_hours=analysis.get("total_hours", 0),
+            credits=analysis.get("credits", 4),
+            uploaded_at=datetime.now()
+        )
         
         # Save to Firebase
-        syllabus_data.update({
-            "id": syllabus_id,
-            "filename": file.filename,
-            "raw_text": raw_text,
-            "uploaded_at": datetime.now()
-        })
+        firebase_client.save_document("syllabus", subject_id, syllabus.dict())
         
-        firebase_client.save_document("syllabi", syllabus_id, syllabus_data)
+        # Extract topics for later use
+        all_topics = []
+        for module in syllabus.modules:
+            for topic in module.get("topics", []):
+                topic_id = str(uuid.uuid4())
+                all_topics.append({
+                    "topic_id": topic_id,
+                    "topic_name": topic,
+                    "module_number": module.get("module_number"),
+                    "module_name": module.get("module_name"),
+                    "subject_id": subject_id
+                })
+        
+        # Save topics
+        for topic in all_topics:
+            firebase_client.save_document("topics", topic["topic_id"], topic)
+        
+        logger.info(f"Uploaded syllabus for {subject_id} with {len(all_topics)} topics")
         
         return {
-            "id": syllabus_id,
-            "message": "Syllabus uploaded and parsed successfully",
-            "data": syllabus_data
+            "message": "Syllabus uploaded and analyzed successfully",
+            "subject_id": subject_id,
+            "analysis": analysis,
+            "total_topics": len(all_topics)
         }
         
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=500, detail="Failed to parse syllabus structure")
     except Exception as e:
         logger.error(f"Error uploading syllabus: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{syllabus_id}")
-async def get_syllabus(syllabus_id: str):
-    """Get parsed syllabus data"""
+@router.get("/{subject_id}")
+async def get_syllabus(subject_id: str):
+    """Get syllabus details"""
     try:
-        syllabus = firebase_client.get_document("syllabi", syllabus_id)
+        syllabus = firebase_client.get_document("syllabus", subject_id)
         if not syllabus:
             raise HTTPException(status_code=404, detail="Syllabus not found")
         return syllabus
+        
     except Exception as e:
-        logger.error(f"Error retrieving syllabus: {e}")
+        logger.error(f"Error getting syllabus: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/{syllabus_id}/topics")
-async def get_syllabus_topics(syllabus_id: str):
-    """Get list of all topics from syllabus"""
+@router.get("/list")
+async def list_syllabi():
+    """List all syllabi"""
     try:
-        syllabus = firebase_client.get_document("syllabi", syllabus_id)
-        if not syllabus:
-            raise HTTPException(status_code=404, detail="Syllabus not found")
+        syllabi = firebase_client.query_documents("syllabus", {}, limit=100)
+        return {"syllabi": syllabi}
         
-        topics = []
-        for unit in syllabus.get("units", []):
-            topics.extend(unit.get("topics", []))
-        
-        return {
-            "syllabus_id": syllabus_id,
-            "course_name": syllabus.get("course_name", ""),
-            "topics": topics,
-            "total_units": len(syllabus.get("units", []))
-        }
-        
-    except Exception as e:
-        logger.error(f"Error retrieving topics: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/{syllabus_id}/units/{unit_number}")
-async def get_unit_details(syllabus_id: str, unit_number: int):
-    """Get detailed information about a specific unit"""
-    try:
-        syllabus = firebase_client.get_document("syllabi", syllabus_id)
-        if not syllabus:
-            raise HTTPException(status_code=404, detail="Syllabus not found")
-        
-        units = syllabus.get("units", [])
-        unit = next((u for u in units if u.get("unit_number") == unit_number), None)
-        
-        if not unit:
-            raise HTTPException(status_code=404, detail="Unit not found")
-        
-        return unit
-        
-    except Exception as e:
-        logger.error(f"Error retrieving unit: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.get("/")
-async def list_syllabi(limit: int = 20):
-    """List all uploaded syllabi"""
-    try:
-        syllabi = firebase_client.query_documents("syllabi", {}, limit=limit)
-        return {
-            "syllabi": [
-                {
-                    "id": s.get("id"),
-                    "course_name": s.get("course_name"),
-                    "course_code": s.get("course_code"),
-                    "uploaded_at": s.get("uploaded_at")
-                }
-                for s in syllabi
-            ],
-            "count": len(syllabi)
-        }
     except Exception as e:
         logger.error(f"Error listing syllabi: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{subject_id}/topics")
+async def get_syllabus_topics(subject_id: str):
+    """Get all topics for a subject"""
+    try:
+        topics = firebase_client.query_documents("topics", {"subject_id": subject_id}, limit=500)
+        
+        # Group by module
+        modules = {}
+        for topic in topics:
+            module_num = topic.get("module_number", 0)
+            if module_num not in modules:
+                modules[module_num] = {
+                    "module_number": module_num,
+                    "module_name": topic.get("module_name", f"Module {module_num}"),
+                    "topics": []
+                }
+            modules[module_num]["topics"].append(topic)
+        
+        return {
+            "subject_id": subject_id,
+            "modules": sorted(modules.values(), key=lambda x: x["module_number"]),
+            "total_topics": len(topics)
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting topics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{subject_id}/analyze-gaps")
+async def analyze_syllabus_gaps(subject_id: str, student_id: str):
+    """Analyze student's knowledge gaps against syllabus using Ollama"""
+    try:
+        # Get syllabus
+        syllabus = firebase_client.get_document("syllabus", subject_id)
+        if not syllabus:
+            raise HTTPException(status_code=404, detail="Syllabus not found")
+        
+        # Get student performance
+        performances = firebase_client.query_documents(
+            "student_performances",
+            {"student_id": student_id, "subject_id": subject_id},
+            limit=1000
+        )
+        
+        # Build gap analysis prompt
+        topics_coverage = {}
+        for perf in performances:
+            topic = perf.get("topic_name", perf.get("topic_id"))
+            topics_coverage[topic] = perf.get("weighted_bkt", 0)
+        
+        prompt = f"""Analyze the student's knowledge gaps in this course:
+
+Syllabus Modules:
+{json.dumps(syllabus.get('modules', []), indent=2)}
+
+Student's Current Knowledge (BKT Scores):
+{json.dumps(topics_coverage, indent=2)}
+
+Identify:
+1. Topics not yet covered (missing from student's knowledge)
+2. Topics with low mastery (BKT < 0.6)
+3. Prerequisite topics that need strengthening
+4. Suggested learning path priority
+
+Return in JSON format:
+{{
+  "uncovered_topics": ["topic1", "topic2"],
+  "weak_topics": [
+    {{"topic": "topic_name", "current_bkt": 0.4, "priority": "high"}}
+  ],
+  "prerequisite_gaps": ["topic1", "topic2"],
+  "suggested_learning_path": [
+    {{"topic": "...", "reason": "...", "estimated_hours": 3}}
+  ],
+  "overall_progress_percentage": 65
+}}"""
+
+        # Analyze using Ollama
+        response = await ollama_client.generate(
+            prompt,
+            system="You are an expert educational analyst. Provide detailed, actionable gap analysis."
+        )
+        
+        # Parse response
+        import json
+        try:
+            response_text = response.strip()
+            if "```json" in response_text:
+                response_text = response_text.split("```json")[1].split("```")[0]
+            elif "```" in response_text:
+                response_text = response_text.split("```")[1].split("```")[0]
+            
+            gap_analysis = json.loads(response_text)
+        except Exception as e:
+            logger.error(f"Error parsing gap analysis: {e}")
+            gap_analysis = {
+                "error": "Failed to parse analysis",
+                "raw_response": response[:500]
+            }
+        
+        return {
+            "student_id": student_id,
+            "subject_id": subject_id,
+            "analysis": gap_analysis
+        }
+        
+    except Exception as e:
+        logger.error(f"Error analyzing gaps: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{subject_id}")
+async def delete_syllabus(subject_id: str):
+    """Delete a syllabus"""
+    try:
+        firebase_client.delete_document("syllabus", subject_id)
+        
+        # Also delete associated topics
+        topics = firebase_client.query_documents("topics", {"subject_id": subject_id}, limit=500)
+        for topic in topics:
+            firebase_client.delete_document("topics", topic["topic_id"])
+        
+        return {"message": "Syllabus and associated topics deleted successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error deleting syllabus: {e}")
         raise HTTPException(status_code=500, detail=str(e))

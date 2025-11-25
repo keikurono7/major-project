@@ -4,12 +4,12 @@ from fastapi.staticfiles import StaticFiles
 import logging
 from contextlib import asynccontextmanager
 
-from app import (
+from . import (
     assignments, quizzes, question_papers, projects, 
     syllabus, chatbot, marks, schedules, analytics
 )
-from app.config import settings
-from app.ollama import ollama_client
+from .config import settings
+from .ollama import ollama_client
 
 # Configure logging
 logging.basicConfig(

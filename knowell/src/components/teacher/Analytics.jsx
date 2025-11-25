@@ -15,7 +15,7 @@ import {
   Legend
 } from 'recharts';
 import { db, collection, getDocs, query, where, doc, getDoc } from '../../services/firebase';
-import { teacherAnalyticsApi } from '../../services/api';
+import { analyticsApi } from '../../services/api';
 
 const Analytics = () => {
   const { currentUser } = useContext(AuthContext);

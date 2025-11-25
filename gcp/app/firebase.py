@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional, List
 import logging
 from datetime import datetime
 
-from app.config import settings
+from .config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class FirebaseClient:
             try:
                 cred = credentials.Certificate(settings.FIREBASE_CREDENTIALS_PATH)
                 firebase_admin.initialize_app(cred, {
-                    'storageBucket': 'your-project-id.appspot.com'
+                    'storageBucket': 'atomic-lens-471613-m4.appspot.com'
                 })
                 self.db = firestore.client()
                 self.bucket = storage.bucket()

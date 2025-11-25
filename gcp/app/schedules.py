@@ -1,16 +1,16 @@
 from fastapi import APIRouter, HTTPException, Query
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 import logging
 from datetime import datetime, date, timedelta
 
-from app.models import (
+from .models import (
     StudentSchedule, SubjectScheduleConfig, ScheduleAdjustment,
     TeacherOverride, StudentTopicPerformance, DailyTasksSummary,
     ScheduleTask, TaskStatus, DataSourceScore
 )
-from app.firebase import firebase_client
-from app.intelligence import schedule_intelligence
-from app.ollama import ollama_client
+from .firebase import firebase_client
+from .intelligence import schedule_intelligence
+from .ollama import ollama_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { getSubmissionFiles, updateSubmissionFeedback } from '../../services/projectService';
-import { evaluateSubmissionApi } from '../../services/api';
+import { projectApi } from '../../services/api';
+import { getStorage, ref, getDownloadURL } from 'firebase/storage';
+import { db, collection, doc, updateDoc, getDoc } from '../../services/firebase';
 
 const ProjectSubmissionReview = ({ project, submissions, onBack }) => {
   const [selectedSubmission, setSelectedSubmission] = useState(null);
@@ -12,6 +13,39 @@ const ProjectSubmissionReview = ({ project, submissions, onBack }) => {
   const [aiEvaluation, setAiEvaluation] = useState(null);
   const [evaluationLoading, setEvaluationLoading] = useState(false);
 
+  // Helper function to get submission files
+  const getSubmissionFiles = async (projectId, studentId, submissionId) => {
+    try {
+      const submissionRef = doc(db, 'project_submissions', submissionId);
+      const submissionSnap = await getDoc(submissionRef);
+      
+      if (!submissionSnap.exists()) {
+        throw new Error('Submission not found');
+      }
+      
+      const submissionData = submissionSnap.data();
+      return submissionData.files || [];
+    } catch (error) {
+      console.error('Error getting submission files:', error);
+      throw error;
+    }
+  };
+
+  // Helper function to update submission feedback
+  const updateSubmissionFeedback = async (submissionId, feedbackData) => {
+    try {
+      const submissionRef = doc(db, 'project_submissions', submissionId);
+      await updateDoc(submissionRef, {
+        feedback: feedbackData,
+        status: 'reviewed',
+        reviewedAt: new Date()
+      });
+    } catch (error) {
+      console.error('Error updating submission feedback:', error);
+      throw error;
+    }
+  };
+
   const handleSelectSubmission = async (submission) => {
     try {
       setLoading(true);
@@ -19,7 +53,7 @@ const ProjectSubmissionReview = ({ project, submissions, onBack }) => {
       const files = await getSubmissionFiles(
         project.id,
         submission.studentId,
-        submission.submissionId
+        submission.id || submission.submissionId
       );
       
       const processedFiles = files.map(file => ({
@@ -29,8 +63,8 @@ const ProjectSubmissionReview = ({ project, submissions, onBack }) => {
       }));
       
       setSubmissionFiles(processedFiles);
-      setFeedback(submission.feedback || '');
-      setScore(submission.score || '');
+      setFeedback(submission.feedback?.text || '');
+      setScore(submission.feedback?.score || '');
       setAiEvaluation(submission.aiEvaluation || null);
     } catch (err) {
       console.error('Error loading submission:', err);
@@ -47,7 +81,7 @@ const ProjectSubmissionReview = ({ project, submissions, onBack }) => {
         return;
       }
 
-      const firebaseUrl = "https://firebasestorage.googleapis.com/v0/b/atomic-lens-471613-m4.firebasestorage.app/o/"+encodeURIComponent(file.fullPath)+"?alt=media";
+      const firebaseUrl = `https://firebasestorage.googleapis.com/v0/b/atomic-lens-471613-m4.firebasestorage.app/o/${encodeURIComponent(file.fullPath)}?alt=media`;
       
       window.open(firebaseUrl, '_blank');
       setViewingFile(file.name);
@@ -69,7 +103,10 @@ const ProjectSubmissionReview = ({ project, submissions, onBack }) => {
         reviewedBy: 'teacher'
       });
       alert('Feedback submitted successfully!');
-      setSelectedSubmission({ ...selectedSubmission, feedback: { text: feedback, score: parseInt(score) } });
+      setSelectedSubmission({ 
+        ...selectedSubmission, 
+        feedback: { text: feedback, score: parseInt(score) } 
+      });
     } catch (err) {
       console.error('Error submitting feedback:', err);
       alert('Error submitting feedback');
@@ -87,20 +124,20 @@ const ProjectSubmissionReview = ({ project, submissions, onBack }) => {
     try {
       setEvaluationLoading(true);
 
-      const evaluation = await evaluateSubmissionApi.evaluateSubmission(
-        project.id,
-        selectedSubmission.submissionId,
-        selectedSubmission.studentId,
-        submissionFiles,
-        project.description,
-        project.instructions
-      );
+      // Prepare code files for evaluation
+      const codeFiles = {};
+      submissionFiles.forEach(file => {
+        codeFiles[file.name] = file.content || '';
+      });
 
-      if (evaluation.success) {
-        setAiEvaluation(evaluation.evaluation);
-      } else {
-        alert('AI evaluation failed');
-      }
+      const evaluation = await projectApi.evaluate({
+        project_id: project.id,
+        submission_text: selectedSubmission.description || '',
+        code_files: codeFiles
+      });
+
+      setAiEvaluation(evaluation.feedback);
+      setScore(evaluation.score.toString());
     } catch (err) {
       console.error('Error sending to AI:', err);
       alert('Error processing AI evaluation: ' + err.message);

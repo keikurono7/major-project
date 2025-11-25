@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { analyticsService } from '../../services/scheduleService';
-import { Card } from '../common/Card';
+import { analyticsApi } from '../../services/api';
+import  Card from '../common/Card';
 import { TrendingUp, TrendingDown, MinusCircle, Info } from 'lucide-react';
 
 export const KnowledgeGraph = ({ studentId, subjectId }) => {

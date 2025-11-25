@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { analyticsApi } from '../../services/api';
-import { Card } from '../common/Card';
+import Card from '../common/Card';
 import { AlertTriangle, TrendingUp, Users } from 'lucide-react';
 
 export const ClassHeatmap = ({ subjectId }) => {

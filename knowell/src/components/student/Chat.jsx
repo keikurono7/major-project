@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useContext } from 'react';
 import { AuthContext } from '../../contexts/AuthContext';
 import { computeAllSubjectsProgress } from '../../services/progress';
-import { chatWithAssistant } from '../../services/api';
+import { chatApi } from '../../services/api';
 import '../../dashboard.css';
 
 const Chat = ({ studentId }) => {
@@ -12,6 +12,7 @@ const Chat = ({ studentId }) => {
   const [chatInput, setChatInput] = useState('');
   const [isChatLoading, setIsChatLoading] = useState(false);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
+  const [sessionId, setSessionId] = useState(null); // Added missing state
   const chatMessagesRef = useRef(null);
 
   useEffect(() => {
@@ -96,12 +97,11 @@ const Chat = ({ studentId }) => {
         content: msg.content
       }));
 
-      const response = await chatWithAssistant(
-        currentUser.id,
-        selectedSubjectId,
+      // Use chatApi.send instead of chatWithAssistant
+      const response = await chatApi.send(
         message,
-        studentName,
-        cleanHistory
+        `Subject: ${selectedSubjectId}`, // context
+        sessionId
       );
 
       console.log('Received response:', response);
@@ -113,6 +113,7 @@ const Chat = ({ studentId }) => {
       };
 
       setChatMessages(prev => [...prev, assistantMessage]);
+      setSessionId(response.session_id);
     } catch (error) {
       console.error('Error sending message:', error);
       
@@ -123,6 +124,18 @@ const Chat = ({ studentId }) => {
       setChatMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsChatLoading(false);
+    }
+  };
+
+  const clearChat = async () => {
+    try {
+      if (sessionId) {
+        await chatApi.clearHistory(sessionId);
+      }
+      setChatMessages([]);
+      setSessionId(null);
+    } catch (error) {
+      console.error('Error clearing chat:', error);
     }
   };
 

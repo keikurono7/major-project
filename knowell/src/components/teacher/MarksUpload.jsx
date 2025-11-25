@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { marksApi } from '../../services/api';
-import { Card } from '../common/Card';
-import { Button } from '../common/Button';
+import Card from '../common/Card';
+import Button from '../common/Button';
 import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 
 export const MarksUpload = ({ subjectId }) => {

@@ -4,7 +4,7 @@ import ParallaxSection from '../common/ParallaxSection';
 import Card from '../common/Card';
 import Button from '../common/Button';
 import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
-import { generateQuestions, finalizeQuestions } from "../../services/api";
+//import { generateQuestions, finalizeQuestions } from "../../services/api";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 

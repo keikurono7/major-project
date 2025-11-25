@@ -25,7 +25,7 @@ const sidebarItems = [
   { id: "students", label: "Students", icon: "👥" }
 ];
 
-export const TeacherHome = () => {
+const TeacherHome = () => {
   const { currentUser } = useContext(AuthContext);
   const { user } = useContext(AuthContext) || {};
   const ctx = useContext(AuthContext) || {};
@@ -540,3 +540,5 @@ export const TeacherHome = () => {
     </div>
   );
 };
+
+export default TeacherHome;

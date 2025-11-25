@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
-import { submitProjectFiles } from '../../services/projectService';
+import { projectApi } from '../../services/api';
+import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { db, collection, addDoc } from '../../services/firebase';
 
 const ProjectSubmission = ({ project, studentId, existingSubmission, onBack, onSubmit }) => {
   const [files, setFiles] = useState([]);
@@ -14,6 +16,44 @@ const ProjectSubmission = ({ project, studentId, existingSubmission, onBack, onS
 
   const handleRemoveFile = (index) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  // Helper function to submit project files
+  const submitProjectFiles = async (projectId, studentId, files) => {
+    try {
+      const storage = getStorage();
+      const uploadedFiles = [];
+
+      // Upload each file to Firebase Storage
+      for (const file of files) {
+        const storageRef = ref(storage, `projects/${projectId}/${studentId}/${file.name}`);
+        await uploadBytes(storageRef, file);
+        const downloadURL = await getDownloadURL(storageRef);
+        
+        uploadedFiles.push({
+          name: file.name,
+          url: downloadURL,
+          fullPath: storageRef.fullPath,
+          size: file.size,
+          type: file.type
+        });
+      }
+
+      // Create submission document
+      const submissionRef = collection(db, 'project_submissions');
+      await addDoc(submissionRef, {
+        projectId,
+        studentId,
+        files: uploadedFiles,
+        status: 'submitted',
+        createdAt: new Date()
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error submitting files:', error);
+      throw error;
+    }
   };
 
   const handleSubmit = async (e) => {

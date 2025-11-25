@@ -4,9 +4,9 @@ import logging
 import uuid
 from datetime import datetime
 
-from app.models import ChatRequest
-from app.firebase import firebase_client
-from app.gemini import gemini_client
+from .models import ChatRequest
+from .firebase import firebase_client
+from .ollama import ollama_client
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -16,7 +16,7 @@ chat_sessions: Dict[str, List[Dict[str, str]]] = {}
 
 @router.post("/chat")
 async def chat(request: ChatRequest):
-    """Chat with AI tutor"""
+    """Chat with AI tutor using Ollama"""
     try:
         # Get or create session
         session_id = request.session_id or str(uuid.uuid4())
@@ -24,39 +24,41 @@ async def chat(request: ChatRequest):
         if session_id not in chat_sessions:
             chat_sessions[session_id] = []
         
-        # Build context
-        system_context = """
-        You are an AI tutor assistant. Your role is to:
-        1. Help students understand concepts clearly
-        2. Answer questions about course material
-        3. Provide examples and explanations
-        4. Guide students through problem-solving
-        5. Encourage critical thinking
-        
-        Be patient, encouraging, and educational in your responses.
-        """
+        # Build system prompt
+        system_context = """You are an AI tutor assistant. Your role is to:
+1. Help students understand concepts clearly
+2. Answer questions about course material
+3. Provide examples and explanations
+4. Guide students through problem-solving
+5. Encourage critical thinking
+
+Be patient, encouraging, and educational in your responses.
+Keep answers concise but thorough."""
         
         # Add context if provided
         if request.context:
             system_context += f"\n\nCourse Context:\n{request.context}"
         
-        # Prepare conversation history
-        history = [
-            {"role": "user", "parts": [system_context]},
-            {"role": "model", "parts": ["I understand. I'm ready to help students learn."]}
+        # Prepare conversation history for Ollama
+        messages = [
+            {"role": "system", "content": system_context}
         ]
         
         # Add previous messages
         for msg in chat_sessions[session_id]:
-            history.append({"role": msg["role"], "parts": [msg["content"]]})
+            messages.append({
+                "role": msg["role"],
+                "content": msg["content"]
+            })
         
         # Add current message
-        history.append({"role": "user", "parts": [request.message]})
+        messages.append({"role": "user", "content": request.message})
         
-        # Get response
-        response = gemini_client.generate_with_context(request.message, history)
+        # Get response from Ollama
+        response = await ollama_client.chat(messages)
+        
         if not response:
-            raise HTTPException(status_code=500, detail="Failed to generate response")
+            raise HTTPException(status_code=500, detail="Failed to generate response from Ollama")
         
         # Update session
         chat_sessions[session_id].append({
@@ -65,7 +67,7 @@ async def chat(request: ChatRequest):
             "timestamp": datetime.now().isoformat()
         })
         chat_sessions[session_id].append({
-            "role": "model",
+            "role": "assistant",
             "content": response,
             "timestamp": datetime.now().isoformat()
         })
@@ -74,12 +76,15 @@ async def chat(request: ChatRequest):
         if len(chat_sessions[session_id]) > 20:
             chat_sessions[session_id] = chat_sessions[session_id][-20:]
         
-        # Save to Firebase
-        firebase_client.save_document("chat_sessions", session_id, {
-            "session_id": session_id,
-            "messages": chat_sessions[session_id],
-            "updated_at": datetime.now()
-        })
+        # Save to Firebase asynchronously
+        try:
+            firebase_client.save_document("chat_sessions", session_id, {
+                "session_id": session_id,
+                "messages": chat_sessions[session_id],
+                "updated_at": datetime.now()
+            })
+        except Exception as e:
+            logger.warning(f"Failed to save chat session to Firebase: {e}")
         
         return {
             "session_id": session_id,
@@ -100,7 +105,10 @@ async def clear_session(session_id: str):
             del chat_sessions[session_id]
         
         # Delete from Firebase
-        firebase_client.delete_document("chat_sessions", session_id)
+        try:
+            firebase_client.delete_document("chat_sessions", session_id)
+        except Exception as e:
+            logger.warning(f"Failed to delete session from Firebase: {e}")
         
         return {"message": "Session cleared successfully", "session_id": session_id}
         

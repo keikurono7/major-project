@@ -3,8 +3,8 @@ from typing import List, Dict, Optional
 import logging
 from datetime import datetime, date, timedelta
 
-from app.firebase import firebase_client
-from app.models import ClassHeatmap
+from .firebase import firebase_client
+from .models import ClassHeatmap
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

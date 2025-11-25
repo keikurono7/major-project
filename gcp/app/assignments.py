@@ -4,9 +4,9 @@ import logging
 import uuid
 from datetime import datetime
 
-from app.models import AssignmentRequest, GeneratedContent, EvaluationResponse
-from app.firebase import firebase_client
-from app.ollama import ollama_client  # Changed from gemini
+from .models import AssignmentRequest, GeneratedContent, EvaluationResponse
+from .firebase import firebase_client
+from .ollama import ollama_client  # Changed from gemini
 
 router = APIRouter()
 logger = logging.getLogger(__name__)

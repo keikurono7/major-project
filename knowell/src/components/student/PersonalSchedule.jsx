@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { scheduleApi, analyticsApi } from '../../services/api';
-import { Card } from '../common/Card';
-import { Button } from '../common/Button';
+import  Card  from '../common/Card';
+import  Button  from '../common/Button';
 import { Calendar, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
 
 export const PersonalSchedule = ({ studentId, subjectId }) => {

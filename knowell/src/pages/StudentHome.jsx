@@ -7,11 +7,10 @@ import QuizInterface from '../components/student/QuizInterface';
 import AssignmentInterface from '../components/student/AssignmentInterface';
 import ProjectsFeed from '../components/student/ProjectsFeed';
 import { computeAllSubjectsProgress } from '../services/progress';
-import { chatWithAssistant } from '../services/api';
 import '../dashboard.css';
 import { PersonalSchedule } from '../components/student/PersonalSchedule';
 import { KnowledgeGraph } from '../components/student/KnowledgeGraph';
-import { Chat } from '../components/student/Chat';
+import  Chat from '../components/student/Chat';
 
 const StudentHome = () => {
   const { currentUser, loading: authLoading } = useContext(AuthContext);
@@ -114,8 +113,6 @@ const StudentHome = () => {
       return;
     }
 
-    const studentName = currentUser.full_name || currentUser.fullName;
-
     const userMessage = {
       role: 'user',
       content: message
@@ -126,34 +123,18 @@ const StudentHome = () => {
     setIsChatLoading(true);
 
     try {
-      console.log('Sending message with params:', {
-        studentId: currentUser.id,
-        subjectId: selectedSubjectId,
-        message: message,
-        studentName: studentName,
-        historyLength: chatMessages.length
-      });
-
-      // Filter out weakTopics and isError from conversation history
-      const cleanHistory = chatMessages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }));
-
-      const response = await chatWithAssistant(
-        currentUser.id,
-        selectedSubjectId,
+      // Import chatApi only when needed
+      const { chatApi } = await import('../services/api');
+      
+      const response = await chatApi.send(
         message,
-        studentName,
-        cleanHistory
+        `Subject: ${selectedSubjectId}, Student: ${currentUser.full_name || currentUser.fullName}`,
+        null // session_id
       );
-
-      console.log('Received response:', response);
 
       const assistantMessage = {
         role: 'assistant',
-        content: response.response,
-        weakTopics: response.knowledge_context
+        content: response.response
       };
 
       setChatMessages(prev => [...prev, assistantMessage]);

@@ -3,11 +3,11 @@ from datetime import datetime, date, timedelta
 import logging
 import math
 
-from app.models import (
+from .models import (
     StudentTopicPerformance, ScheduleTask, WeeklyPlan, StudentSchedule,
     SubjectScheduleConfig, SchedulePriority, TaskStatus
 )
-from app.firebase import firebase_client
+from .firebase import firebase_client
 
 logger = logging.getLogger(__name__)
 
