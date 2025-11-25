@@ -9,6 +9,9 @@ import ProjectsFeed from '../components/student/ProjectsFeed';
 import { computeAllSubjectsProgress } from '../services/progress';
 import { chatWithAssistant } from '../services/api';
 import '../dashboard.css';
+import { PersonalSchedule } from '../components/student/PersonalSchedule';
+import { KnowledgeGraph } from '../components/student/KnowledgeGraph';
+import { Chat } from '../components/student/Chat';
 
 const StudentHome = () => {
   const { currentUser, loading: authLoading } = useContext(AuthContext);
@@ -668,6 +671,51 @@ const StudentHome = () => {
       <div className="flex-1">
         <Navbar user={currentUser} />
         <main className="flex-1 bg-gray-100 p-6">
+          {/* Tab Navigation */}
+          <div className="flex gap-4 mb-6">
+            <button
+              onClick={() => setActiveTab('schedule')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                activeTab === 'schedule'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              📅 My Schedule
+            </button>
+            <button
+              onClick={() => setActiveTab('knowledge')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                activeTab === 'knowledge'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              🎯 Knowledge Map
+            </button>
+            <button
+              onClick={() => setActiveTab('chat')}
+              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
+                activeTab === 'chat'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              💬 AI Tutor
+            </button>
+          </div>
+
+          {/* Content */}
+          {activeTab === 'schedule' && (
+            <PersonalSchedule studentId={currentUser?.id} subjectId={selectedSubjectId} />
+          )}
+          {activeTab === 'knowledge' && (
+            <KnowledgeGraph studentId={currentUser?.id} subjectId={selectedSubjectId} />
+          )}
+          {activeTab === 'chat' && (
+            <Chat studentId={currentUser?.id} />
+          )}
+
           {renderContent()}
         </main>
       </div>

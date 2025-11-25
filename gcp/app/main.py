@@ -4,7 +4,10 @@ from fastapi.staticfiles import StaticFiles
 import logging
 from contextlib import asynccontextmanager
 
-from app import assignments, quizzes, question_papers, projects, syllabus, chatbot
+from app import (
+    assignments, quizzes, question_papers, projects, 
+    syllabus, chatbot, marks, schedules, analytics
+)
 from app.config import settings
 from app.ollama import ollama_client
 
@@ -32,15 +35,15 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="GCP AI Education API",
-    description="AI-powered education tools API using Ollama",
-    version="1.0.0",
+    description="AI-powered education platform with personalized learning schedules",
+    version="2.0.0",
     lifespan=lifespan
 )
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -59,12 +62,23 @@ app.include_router(question_papers.router, prefix="/api/question-papers", tags=[
 app.include_router(projects.router, prefix="/api/projects", tags=["Projects"])
 app.include_router(syllabus.router, prefix="/api/syllabus", tags=["Syllabus"])
 app.include_router(chatbot.router, prefix="/api/chatbot", tags=["Chatbot"])
+app.include_router(marks.router, prefix="/api/marks", tags=["Marks & BKT"])
+app.include_router(schedules.router, prefix="/api/schedules", tags=["Personal Schedules"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics & Dashboards"])
 
 @app.get("/")
 async def root():
     return {
         "message": "GCP AI Education API",
-        "version": "1.0.0",
+        "version": "2.0.0",
+        "features": [
+            "Multi-source mark integration (Quiz, Assignment, PBL, IA, Semester Exams)",
+            "Personalized learning schedules",
+            "BKT-based knowledge tracking",
+            "AI-powered content generation",
+            "Real-time progress monitoring",
+            "Class-wide analytics and heatmaps"
+        ],
         "ai_engine": "Ollama",
         "model": settings.OLLAMA_MODEL,
         "docs": "/docs"

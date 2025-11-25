@@ -12,6 +12,8 @@ import StudentMonitoring from '../components/teacher/StudentMonitoring';
 import { createClass, getClassesForUser } from '../services/class';
 import ProjectsManagement from "../components/teacher/ProjectsManagement";
 import { db, collection, getDocs, query, where } from '../services/firebase';
+import { ClassHeatmap } from '../components/teacher/ClassHeatmap';
+import { MarksUpload } from '../components/teacher/MarksUpload';
 
 // Using string icons to match your existing sidebar structure
 const sidebarItems = [
@@ -23,7 +25,7 @@ const sidebarItems = [
   { id: "students", label: "Students", icon: "👥" }
 ];
 
-const TeacherHome = () => {
+export const TeacherHome = () => {
   const { currentUser } = useContext(AuthContext);
   const { user } = useContext(AuthContext) || {};
   const ctx = useContext(AuthContext) || {};
@@ -42,6 +44,7 @@ const TeacherHome = () => {
   });
   const [recentActivity, setRecentActivity] = useState([]);
   const [studentsList, setStudentsList] = useState([]);
+  const [selectedSubject, setSelectedSubject] = useState('subject_1');
 
   const { register, handleSubmit, reset } = useForm();
 
@@ -500,6 +503,16 @@ const TeacherHome = () => {
       case 'projects':
         return <ProjectsManagement teacherId={currentUser.id} />;
         
+      case 'overview':
+        return (
+          <ClassHeatmap subjectId={selectedSubject} />
+        );
+        
+      case 'marks':
+        return (
+          <MarksUpload subjectId={selectedSubject} />
+        );
+        
       default:
         return (
           <div className="card">
@@ -527,5 +540,3 @@ const TeacherHome = () => {
     </div>
   );
 };
-
-export default TeacherHome;
