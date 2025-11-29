@@ -10,7 +10,7 @@ import { computeAllSubjectsProgress } from '../services/progress';
 import '../dashboard.css';
 import { PersonalSchedule } from '../components/student/PersonalSchedule';
 import { KnowledgeGraph } from '../components/student/KnowledgeGraph';
-import  Chat from '../components/student/Chat';
+import Chat from '../components/student/Chat';
 
 const StudentHome = () => {
   const { currentUser, loading: authLoading } = useContext(AuthContext);
@@ -91,6 +91,9 @@ const StudentHome = () => {
 
   const sidebarItems = [
     { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+    { id: 'schedule', label: 'My Schedule', icon: '📅' },
+    { id: 'knowledge', label: 'Knowledge Map', icon: '🎯' },
+    { id: 'chat', label: 'AI Tutor', icon: '💬' },
     { id: 'projects', label: 'Projects', icon: '🗂️' },
     { id: 'quizzes', label: 'Take Quiz', icon: '❓' },
     { id: 'assignments', label: 'Assignments', icon: '📝' },
@@ -583,6 +586,15 @@ const StudentHome = () => {
           </>
         );
 
+      case 'schedule':
+        return <PersonalSchedule studentId={currentUser?.id} subjectId={selectedSubjectId} />;
+
+      case 'knowledge':
+        return <KnowledgeGraph studentId={currentUser?.id} subjectId={selectedSubjectId} />;
+
+      case 'chat':
+        return <Chat studentId={currentUser?.id} />;
+
       case 'quizzes':
         return <QuizInterface studentId={currentUser.id} />;
 
@@ -652,51 +664,6 @@ const StudentHome = () => {
       <div className="flex-1">
         <Navbar user={currentUser} />
         <main className="flex-1 bg-gray-100 p-6">
-          {/* Tab Navigation */}
-          <div className="flex gap-4 mb-6">
-            <button
-              onClick={() => setActiveTab('schedule')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeTab === 'schedule'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              📅 My Schedule
-            </button>
-            <button
-              onClick={() => setActiveTab('knowledge')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeTab === 'knowledge'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              🎯 Knowledge Map
-            </button>
-            <button
-              onClick={() => setActiveTab('chat')}
-              className={`px-6 py-3 rounded-lg font-semibold transition-colors ${
-                activeTab === 'chat'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              💬 AI Tutor
-            </button>
-          </div>
-
-          {/* Content */}
-          {activeTab === 'schedule' && (
-            <PersonalSchedule studentId={currentUser?.id} subjectId={selectedSubjectId} />
-          )}
-          {activeTab === 'knowledge' && (
-            <KnowledgeGraph studentId={currentUser?.id} subjectId={selectedSubjectId} />
-          )}
-          {activeTab === 'chat' && (
-            <Chat studentId={currentUser?.id} />
-          )}
-
           {renderContent()}
         </main>
       </div>

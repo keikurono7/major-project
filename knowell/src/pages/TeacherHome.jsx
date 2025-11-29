@@ -14,6 +14,7 @@ import ProjectsManagement from "../components/teacher/ProjectsManagement";
 import { db, collection, getDocs, query, where } from '../services/firebase';
 import { ClassHeatmap } from '../components/teacher/ClassHeatmap';
 import { MarksUpload } from '../components/teacher/MarksUpload';
+import QuestionPaperGenerator from '../components/teacher/QuestionPaperGenerator';
 
 // Using string icons to match your existing sidebar structure
 const sidebarItems = [
@@ -449,7 +450,7 @@ const TeacherHome = () => {
         );
         
       case "papers":
-        return <PaperGenerator onGenerate={handleGeneratePaper} />;
+        return <QuestionPaperGenerator teacherId={currentUser.id} />;
         
       case "analytics":
         return <Analytics />;
