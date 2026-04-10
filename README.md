@@ -1,6 +1,6 @@
-# KnowEll – AI-Powered Educational Platform
+# Knowell – AI-Powered Educational Platform
 
-KnowEll is a full-stack educational platform that uses AI to automate content generation (question papers, quizzes, assignments) and provide intelligent learning support for students and teachers.
+Knowell is a full-stack educational platform that uses AI to automate content generation (question papers, quizzes, assignments) and provide intelligent learning support for students and teachers.
 
 ## Features
 
